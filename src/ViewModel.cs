@@ -114,6 +114,10 @@ namespace ClickUpWidget
         public string UpdateText { get => _updateText; set { if (Set(ref _updateText, value)) Raise(nameof(HasUpdate)); } }
         public bool HasUpdate => UpdateText.Length > 0;
 
+        private int _layout;
+        /// <summary>Змінюється, коли в меню змінили «Що показувати» — вигляд перечитує налаштування.</summary>
+        public int Layout { get => _layout; set => Set(ref _layout, value); }
+
         // Дії (їх підставляє AppController)
         public ICommand OpenTask { get; set; } = new RelayCommand(() => { });
         public ICommand ToggleTimer { get; set; } = new RelayCommand(() => { });

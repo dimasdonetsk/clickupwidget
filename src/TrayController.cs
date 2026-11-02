@@ -15,6 +15,9 @@ namespace ClickUpWidget
         private readonly WF.NotifyIcon _icon;
         private readonly WF.ContextMenuStrip _menu;
         private bool? _iconRunning;
+        /// <summary>Клікнули галочку в «Що показувати» — меню не закриваємо, щоб можна було поставити кілька.</summary>
+        private bool _keepOpen;
+        private const string KeepTag = "keep";
 
         public TrayController(AppController app)
         {
@@ -28,7 +31,8 @@ namespace ClickUpWidget
                 BackColor = DarkMenuRenderer.Back,
                 ForeColor = DarkMenuRenderer.Text,
             };
-            _menu.Opening += (_, _) => BuildMenu();
+            _menu.Opening += (_, _) => { _keepOpen = false; BuildMenu(); };
+            KeepOpenOnToggle(_menu);
 
             _icon = new WF.NotifyIcon
             {
@@ -87,6 +91,7 @@ namespace ClickUpWidget
 
             _menu.Items.Add(Toggle("Панель на робочому столі", s.ShowPanel, v => _app.SetPanelVisible(v)));
             _menu.Items.Add(Toggle("Віконце оновлень", s.ShowInbox, v => _app.SetInboxVisible(v)));
+            _menu.Items.Add(BuildDisplayMenu(s));
             _menu.Items.Add(Toggle("Закріпити положення віконець", s.LockPanel, v => _app.Change(x => x.LockPanel = v)));
 
             IReadOnlyList<(string Id, string Name)> teams = _app.Teams;
@@ -133,9 +138,86 @@ namespace ClickUpWidget
             Point cursor = WF.Cursor.Position;
             Rectangle screen = WF.Screen.FromPoint(cursor).WorkingArea;
             bool openLeft = cursor.X > screen.Left + screen.Width / 2;
-            foreach (WF.ToolStripItem item in _menu.Items)
+            SetDirection(_menu.Items, openLeft ? WF.ToolStripDropDownDirection.Left : WF.ToolStripDropDownDirection.Right);
+        }
+
+        private static void SetDirection(WF.ToolStripItemCollection items, WF.ToolStripDropDownDirection dir)
+        {
+            foreach (WF.ToolStripItem item in items)
                 if (item is WF.ToolStripMenuItem mi && mi.DropDownItems.Count > 0)
-                    mi.DropDownDirection = openLeft ? WF.ToolStripDropDownDirection.Left : WF.ToolStripDropDownDirection.Right;
+                {
+                    mi.DropDownDirection = dir;
+                    SetDirection(mi.DropDownItems, dir);    // вкладені підменю теж
+                }
+        }
+
+        /// <summary>Підменю «Що показувати»: розділи панелі, статуси, проєкти, флайаут, інбокс.</summary>
+        private WF.ToolStripMenuItem BuildDisplayMenu(Settings s)
+        {
+            var root = Sub("Що показувати");
+
+            var panel = Sub("Панель на столі");
+            panel.DropDownItems.Add(Keep("Час за сьогодні", s.ShowTodayTime, v => _app.SetDisplay(x => x.ShowTodayTime = v)));
+            panel.DropDownItems.Add(Keep("Таймер", s.ShowTimer, v => _app.SetDisplay(x => x.ShowTimer = v)));
+            panel.DropDownItems.Add(Keep("Сьогодні (дедлайни)", s.ShowDueSection, v => _app.SetDisplay(x => x.ShowDueSection = v)));
+            panel.DropDownItems.Add(Keep("Усі відкриті задачі", s.ShowAllSection, v => _app.SetDisplay(x => x.ShowAllSection = v)));
+            root.DropDownItems.Add(panel);
+
+            var flyout = Sub("Картка з трею");
+            flyout.DropDownItems.Add(Keep("Таймер", s.FlyoutShowTimer, v => _app.SetDisplay(x => x.FlyoutShowTimer = v)));
+            flyout.DropDownItems.Add(Keep("Сьогодні (дедлайни)", s.FlyoutShowDue, v => _app.SetDisplay(x => x.FlyoutShowDue = v)));
+            root.DropDownItems.Add(flyout);
+
+            var inbox = Sub("Віконце оновлень");
+            inbox.DropDownItems.Add(Keep("Коментарі", s.InboxComments, v => _app.SetDisplay(x => x.InboxComments = v)));
+            inbox.DropDownItems.Add(Keep("Зміни статусів", s.InboxStatuses, v => _app.SetDisplay(x => x.InboxStatuses = v)));
+            root.DropDownItems.Add(inbox);
+            root.DropDownItems.Add(new WF.ToolStripSeparator());
+
+            var statuses = Sub("Статуси");
+            List<(string Name, string? Color, bool Visible)> known = _app.KnownStatuses();
+            if (known.Count == 0) statuses.DropDownItems.Add(Info("Задачі ще завантажуються…"));
+            foreach (var (name, _, visible) in known)
+            {
+                string captured = name;
+                statuses.DropDownItems.Add(Keep(TaskText.StatusLabel(name), visible, v => _app.SetStatusVisible(captured, v)));
+            }
+            root.DropDownItems.Add(statuses);
+
+            var projects = Sub("Проєкти");
+            List<(string Project, bool Visible)> projectList = _app.KnownProjects();
+            if (projectList.Count == 0) projects.DropDownItems.Add(Info("Задачі ще завантажуються…"));
+            foreach ((string project, bool visible) in projectList)
+            {
+                string captured = project;
+                projects.DropDownItems.Add(Keep(project.Length > 0 ? project : "Без мітки", visible,
+                    v => _app.SetProjectVisible(captured, v)));
+            }
+            root.DropDownItems.Add(projects);
+
+            return root;
+        }
+
+        /// <summary>Галочка, після кліку по якій меню лишається відкритим.</summary>
+        private WF.ToolStripMenuItem Keep(string text, bool isChecked, Action<bool> onChange)
+        {
+            var item = new WF.ToolStripMenuItem(text) { ForeColor = DarkMenuRenderer.Text, Checked = isChecked, Tag = KeepTag };
+            item.Click += (_, _) =>
+            {
+                item.Checked = !item.Checked;
+                onChange(item.Checked);
+            };
+            return item;
+        }
+
+        /// <summary>Не закривати меню (і батьківські), якщо клікнули галочку з тегом keep.</summary>
+        private void KeepOpenOnToggle(WF.ToolStripDropDown dropDown)
+        {
+            dropDown.ItemClicked += (_, e) => _keepOpen = Equals(e.ClickedItem?.Tag, KeepTag);
+            dropDown.Closing += (_, e) =>
+            {
+                if (_keepOpen && e.CloseReason == WF.ToolStripDropDownCloseReason.ItemClicked) e.Cancel = true;
+            };
         }
 
         private static WF.ToolStripMenuItem Item(string text, Action onClick)
@@ -159,10 +241,11 @@ namespace ClickUpWidget
             return item;
         }
 
-        private static WF.ToolStripMenuItem Sub(string text)
+        private WF.ToolStripMenuItem Sub(string text)
         {
             var item = new WF.ToolStripMenuItem(text) { ForeColor = DarkMenuRenderer.Text };
             item.DropDown.BackColor = DarkMenuRenderer.Back;
+            KeepOpenOnToggle(item.DropDown);
             if (item.DropDown is WF.ToolStripDropDownMenu dd)
             {
                 dd.ShowImageMargin = false;

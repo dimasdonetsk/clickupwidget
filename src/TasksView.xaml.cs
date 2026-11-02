@@ -54,12 +54,25 @@ namespace ClickUpWidget
         private void ApplyVisibility()
         {
             DashboardViewModel? vm = _vm;
+            Settings s = AppController.Current?.Settings ?? new Settings();
             bool loaded = vm?.Loaded == true && vm.NeedsToken == false;
-            AllSection.Visibility = _compact ? Visibility.Collapsed : Visibility.Visible;
-            EmptyText.Visibility = !_compact && loaded && vm!.HasTasks == false ? Visibility.Visible : Visibility.Collapsed;
-            CompactEmpty.Visibility = _compact && loaded && vm!.HasDue == false ? Visibility.Visible : Visibility.Collapsed;
-            OpenLink.Visibility = vm?.HasUpdate == true ? Visibility.Collapsed : Visibility.Visible;
+
+            // Що показувати — налаштовується в меню («Що показувати»), окремо для панелі й флайаута.
+            bool showTime = _compact || s.ShowTodayTime;
+            bool showTimer = _compact ? s.FlyoutShowTimer : s.ShowTimer;
+            bool showDue = _compact ? s.FlyoutShowDue : s.ShowDueSection;
+            bool showAll = !_compact && s.ShowAllSection;
+
+            TodayLine.Visibility = Vis(showTime);
+            TimerCard.Visibility = Vis(showTimer && vm?.HasTimer == true);
+            DueSection.Visibility = Vis(showDue && vm?.HasDue == true);
+            AllSection.Visibility = Vis(showAll);
+            EmptyText.Visibility = Vis(showAll && loaded && vm!.HasTasks == false);
+            CompactEmpty.Visibility = Vis(_compact && showDue && loaded && vm!.HasDue == false);
+            OpenLink.Visibility = Vis(vm?.HasUpdate != true);
         }
+
+        private static Visibility Vis(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
 
         private void Header_Down(object sender, MouseButtonEventArgs e)
         {

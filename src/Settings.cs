@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -20,6 +21,26 @@ namespace ClickUpWidget
         /// <summary>Положення панелі на столі (у WPF-одиницях). null — правий верхній кут.</summary>
         public double? PanelLeft { get; set; }
         public double? PanelTop { get; set; }
+
+        // Що показувати на панелі
+        public bool ShowTodayTime { get; set; } = true;
+        public bool ShowTimer { get; set; } = true;
+        public bool ShowDueSection { get; set; } = true;
+        public bool ShowAllSection { get; set; } = true;
+        // …у флайауті з трею
+        public bool FlyoutShowTimer { get; set; } = true;
+        public bool FlyoutShowDue { get; set; } = true;
+        // …в інбоксі
+        public bool InboxComments { get; set; } = true;
+        public bool InboxStatuses { get; set; } = true;
+
+        /// <summary>
+        /// Вибір людини для окремих статусів (назва в нижньому регістрі → показувати чи ні).
+        /// Статуси без запису — за правилом за замовчуванням (беклог, скасовані й виконані сховані).
+        /// </summary>
+        public Dictionary<string, bool> StatusVisibility { get; set; } = new();
+        /// <summary>Сховані проєкти (мітки АП, GM…; порожній рядок — задачі без мітки).</summary>
+        public List<string> HiddenProjects { get; set; } = new();
 
         /// <summary>Маленьке віконце оновлень (коментарі й статуси).</summary>
         public bool ShowInbox { get; set; } = true;

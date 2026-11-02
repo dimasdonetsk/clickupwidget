@@ -68,7 +68,7 @@
         <Grid x:Name="Header" Background="Transparent" Margin="0,0,0,12" MouseLeftButtonDown="Header_Down">
             <StackPanel>
                 <TextBlock x:Name="HeaderTitle" Text="Мої задачі" FontSize="15" FontWeight="SemiBold"/>
-                <TextBlock Text="{Binding TodayText}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,2,0,0"/>
+                <TextBlock x:Name="TodayLine" Text="{Binding TodayText}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,2,0,0"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
                 <Button Style="{StaticResource GhostButton}" Command="{Binding Refresh}" ToolTip="Оновити" Content="&#xE72C;"/>
@@ -88,7 +88,7 @@
         </Border>
 
         <!-- Запущений таймер -->
-        <Border Visibility="{Binding HasTimer, Converter={StaticResource Vis}}" Background="{DynamicResource TimerBg}"
+        <Border x:Name="TimerCard" Visibility="Collapsed" Background="{DynamicResource TimerBg}"
                 BorderBrush="{DynamicResource TimerLine}" BorderThickness="1" CornerRadius="12" Padding="12,8" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -118,7 +118,7 @@
                       MaxHeight="600" Focusable="False">
             <StackPanel Margin="0,0,2,0">
                 <!-- Сьогодні: дедлайн сьогодні або вже минув. Без кольорових акцентів. -->
-                <StackPanel Visibility="{Binding HasDue, Converter={StaticResource Vis}}">
+                <StackPanel x:Name="DueSection" Visibility="Collapsed">
                     <Grid Margin="4,4,4,4">
                         <TextBlock Text="СЬОГОДНІ" Style="{StaticResource Section}"/>
                         <TextBlock Text="{Binding DueCount}" Style="{StaticResource Section}" HorizontalAlignment="Right"/>

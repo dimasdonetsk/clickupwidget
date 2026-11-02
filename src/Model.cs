@@ -86,7 +86,18 @@ namespace ClickUpWidget
         /// <summary>Дедлайн сьогодні або вже минув.</summary>
         public static bool IsDueNow(DateTime? due, DateTime now) => due != null && due.Value.Date <= now.Date;
 
-        /// <summary>Закриті, виконані, скасовані й беклог у віджеті не показуємо.</summary>
+        /// <summary>
+        /// Чи показувати задачу з урахуванням вибору людини в меню «Що показувати».
+        /// statusVisibility — ручний вибір для статусів (ключ у нижньому регістрі), решта — за IsOpen.
+        /// </summary>
+        public static bool IsVisible(TaskItem t, IDictionary<string, bool> statusVisibility, ICollection<string> hiddenProjects)
+        {
+            if (hiddenProjects.Contains(t.Project)) return false;
+            if (string.Equals(t.StatusType, "closed", StringComparison.OrdinalIgnoreCase)) return false;
+            return statusVisibility.TryGetValue(t.Status.ToLowerInvariant(), out bool shown) ? shown : IsOpen(t);
+        }
+
+        /// <summary>За замовчуванням закриті, виконані, скасовані й беклог у віджеті не показуємо.</summary>
         public static bool IsOpen(TaskItem t) =>
             !string.Equals(t.StatusType, "closed", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(t.StatusType, "done", StringComparison.OrdinalIgnoreCase)

@@ -194,7 +194,7 @@ namespace ClickUpWidget
                 await Task.WhenAll(tasks, running, finished);
 
                 _allTasks = tasks.Result;
-                _tasks = _allTasks.Where(TaskText.IsOpen).ToList();
+                _tasks = Visible(_allTasks);
                 _running = running.Result;
                 _finishedToday = finished.Result;
                 _dataDay = DateTime.Today;
@@ -372,6 +372,67 @@ namespace ClickUpWidget
             }
         }
 
+        // ───────────────────────────── що показувати ─────────────────────────────
+
+        private List<TaskItem> Visible(IEnumerable<TaskItem> tasks) =>
+            tasks.Where(t => TaskText.IsVisible(t, Settings.StatusVisibility, Settings.HiddenProjects)).ToList();
+
+        /// <summary>Статуси, які трапляються в моїх задачах (і ті, що я колись налаштовував), у порядку ClickUp.</summary>
+        public List<(string Name, string? Color, bool Visible)> KnownStatuses()
+        {
+            var result = new List<(string, string?, bool)>();
+            var seen = new HashSet<string>();
+            foreach (TaskItem t in _allTasks.OrderBy(t => t.StatusOrder))
+            {
+                string key = t.Status.ToLowerInvariant();
+                if (key.Length == 0 || !seen.Add(key)) continue;
+                bool shown = Settings.StatusVisibility.TryGetValue(key, out bool v) ? v : TaskText.IsOpen(t);
+                result.Add((t.Status, t.StatusColor, shown));
+            }
+            foreach ((string key, bool v) in Settings.StatusVisibility)
+                if (seen.Add(key)) result.Add((key, null, v));
+            return result;
+        }
+
+        /// <summary>Мітки проєктів з моїх задач; порожній рядок — задачі без мітки.</summary>
+        public List<(string Project, bool Visible)> KnownProjects()
+        {
+            var all = _allTasks.Select(t => t.Project).Concat(Settings.HiddenProjects).Distinct()
+                .OrderBy(p => p.Length == 0 ? 1 : 0).ThenBy(p => p, StringComparer.CurrentCulture);
+            return all.Select(p => (p, !Settings.HiddenProjects.Contains(p))).ToList();
+        }
+
+        public void SetStatusVisible(string status, bool visible)
+        {
+            Change(s => s.StatusVisibility[status.ToLowerInvariant()] = visible);
+            ApplyDisplay();
+        }
+
+        public void SetProjectVisible(string project, bool visible)
+        {
+            Change(s =>
+            {
+                s.HiddenProjects.Remove(project);
+                if (!visible) s.HiddenProjects.Add(project);
+            });
+            ApplyDisplay();
+        }
+
+        public void SetDisplay(Action<Settings> change)
+        {
+            Change(change);
+            ApplyDisplay();
+        }
+
+        /// <summary>Перемалювати все після зміни «Що показувати».</summary>
+        private void ApplyDisplay()
+        {
+            _tasks = Visible(_allTasks);
+            Render();
+            RenderInbox();
+            _vm.Layout++;
+        }
+
         // ───────────────────────────── тихий інбокс ─────────────────────────────
 
         private async Task UpdateInboxAsync()
@@ -405,11 +466,15 @@ namespace ClickUpWidget
         private void RenderInbox()
         {
             DateTime now = DateTime.Now;
+            List<InboxEvent> shown = _inbox.Events.Where(e =>
+                    (e.Kind == "comment" ? Settings.InboxComments : Settings.InboxStatuses)
+                    && !Settings.HiddenProjects.Contains(e.Project))
+                .ToList();
             _ivm.Rows.Clear();
-            foreach (InboxEvent e in _inbox.Events)
+            foreach (InboxEvent e in shown)
                 _ivm.Rows.Add(new InboxRow(e) { TimeText = Inbox.Ago(e.AtMs, now), IsUnread = e.AtMs > _inbox.LastReadMs });
-            _ivm.Unread = Inbox.Unread(_inbox);
-            _ivm.IsEmpty = _inbox.Events.Count == 0;
+            _ivm.Unread = shown.Count(e => e.AtMs > _inbox.LastReadMs);
+            _ivm.IsEmpty = shown.Count == 0;
         }
 
         private void MarkInboxRead()

@@ -139,5 +139,27 @@ namespace ClickUpWidget.Tests
             Assert.Null(t.StatusColor);
             Assert.Equal("", t.ListId);
         }
+
+        [Fact]
+        public void UserChoiceOverridesDefaultStatusRules()
+        {
+            var vis = new System.Collections.Generic.Dictionary<string, bool> { ["backlog"] = true, ["client reviews"] = false };
+            var hidden = new System.Collections.Generic.List<string>();
+            Assert.True(TaskText.IsVisible(new TaskItem { Status = "Backlog", StatusType = "custom" }, vis, hidden));
+            Assert.False(TaskText.IsVisible(new TaskItem { Status = "client reviews", StatusType = "custom" }, vis, hidden));
+            Assert.True(TaskText.IsVisible(new TaskItem { Status = "to do", StatusType = "open" }, vis, hidden));
+            Assert.False(TaskText.IsVisible(new TaskItem { Status = "cancelled", StatusType = "custom" }, vis, hidden));
+            Assert.False(TaskText.IsVisible(new TaskItem { Status = "closed", StatusType = "closed" }, vis, hidden));
+        }
+
+        [Fact]
+        public void HiddenProjectsAreHidden()
+        {
+            var vis = new System.Collections.Generic.Dictionary<string, bool>();
+            var hidden = new System.Collections.Generic.List<string> { "RM", "" };
+            Assert.False(TaskText.IsVisible(new TaskItem { Project = "RM", Status = "to do", StatusType = "open" }, vis, hidden));
+            Assert.False(TaskText.IsVisible(new TaskItem { Project = "", Status = "to do", StatusType = "open" }, vis, hidden));
+            Assert.True(TaskText.IsVisible(new TaskItem { Project = "АП", Status = "to do", StatusType = "open" }, vis, hidden));
+        }
     }
 }
