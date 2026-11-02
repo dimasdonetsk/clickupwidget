@@ -1,0 +1,67 @@
+name: Build & Release
+
+# Кожен push у main збирає програму. Якщо в src/ClickUpWidget.csproj нова <Version>,
+# створюється реліз на GitHub з інсталятором ClickUpWidget-win-Setup.exe,
+# і встановлені копії віджета оновлюються з нього самі.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      REPO_URL: https://github.com/${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          [xml]$proj = Get-Content src/ClickUpWidget.csproj
+          $v = @($proj.Project.PropertyGroup.Version | Where-Object { $_ })[0]
+          "version=$v" >> $env:GITHUB_OUTPUT
+          gh release view "v$v" --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) { "release=false" >> $env:GITHUB_OUTPUT } else { "release=true" >> $env:GITHUB_OUTPUT }
+          exit 0
+
+      - name: Tests
+        run: dotnet test tests/ClickUpWidget.Tests/ClickUpWidget.Tests.csproj -c Release
+
+      - name: Publish
+        run: dotnet publish src/ClickUpWidget.csproj -c Release -r win-x64 --self-contained true -o publish
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.161
+
+      - name: Download previous release (for small delta updates)
+        if: steps.ver.outputs.release == 'true'
+        continue-on-error: true
+        run: vpk download github --repoUrl ${{ env.REPO_URL }} --token ${{ github.token }}
+
+      - name: Pack installer
+        run: >
+          vpk pack --packId ClickUpWidget --packVersion ${{ steps.ver.outputs.version }} --packDir publish
+          --mainExe ClickUpWidget.exe --packTitle "ClickUp Widget" --icon src/app.ico
+
+      - name: Create GitHub release
+        if: steps.ver.outputs.release == 'true'
+        run: >
+          vpk upload github --outputDir Releases --repoUrl ${{ env.REPO_URL }} --token ${{ github.token }}
+          --publish --releaseName "ClickUp Widget ${{ steps.ver.outputs.version }}" --tag v${{ steps.ver.outputs.version }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClickUpWidget-Setup-${{ steps.ver.outputs.version }}
+          path: Releases/*Setup.exe

@@ -1,0 +1,21 @@
+<Application x:Class="ClickUpWidget.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <!-- Кольори теми. Значення підміняє Theme.Apply() під час запуску і при перемиканні теми. -->
+        <SolidColorBrush x:Key="Card" Color="#E6121218"/>
+        <SolidColorBrush x:Key="CardSolid" Color="#121218"/>
+        <SolidColorBrush x:Key="Line" Color="#14FFFFFF"/>
+        <SolidColorBrush x:Key="Fg" Color="#ECEBF2"/>
+        <SolidColorBrush x:Key="Fg2" Color="#9B99A8"/>
+        <SolidColorBrush x:Key="Fg3" Color="#6E6C79"/>
+        <SolidColorBrush x:Key="Hover" Color="#0DFFFFFF"/>
+        <SolidColorBrush x:Key="Btn" Color="#14FFFFFF"/>
+        <SolidColorBrush x:Key="Menu" Color="#1C1B24"/>
+        <SolidColorBrush x:Key="TimerBg" Color="#176FD39A"/>
+        <SolidColorBrush x:Key="TimerLine" Color="#386FD39A"/>
+        <SolidColorBrush x:Key="TimerFg" Color="#6FD39A"/>
+        <FontFamily x:Key="Ui">Segoe UI Variable Text, Segoe UI</FontFamily>
+    </Application.Resources>
+</Application>
