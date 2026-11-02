@@ -28,13 +28,22 @@ namespace ClickUpWidget
         private long _userId;
         private List<(string Id, string Name)> _teams = new();
 
-        private List<TaskItem> _tasks = new();
+        private List<TaskItem> _tasks = new();          // те, що показуємо (без беклогу, скасованих, done)
+        private List<TaskItem> _allTasks = new();       // усе незакрите на мене — для інбоксу
         private RunningTimer? _running;
         private TimeSpan _finishedToday;
         private DateTime _dataDay = DateTime.Today;
         private DateTime? _lastOk;
         private bool _refreshing;
         private readonly Dictionary<string, List<StatusOption>> _statusCache = new();
+
+        // Тихий інбокс
+        private readonly InboxViewModel _ivm = new();
+        private InboxWindow? _inboxWindow;
+        private InboxState _inbox = new();
+        /// <summary>Статуси, які людина поставила сама через віджет — їх в інбокс не кладемо.</summary>
+        private readonly Dictionary<string, string> _selfStatus = new();
+        private int _lastMinute = -1;
 
         private readonly DispatcherTimer _refreshTimer = new();
         private readonly DispatcherTimer _pollTimer = new() { Interval = TimeSpan.FromSeconds(45) };
@@ -58,8 +67,15 @@ namespace ClickUpWidget
             _vm.AddToken = new RelayCommand(ShowTokenWindow);
             _vm.ApplyUpdate = new RelayCommand(ApplyUpdate);
 
+            _inbox = Inbox.Load();
+            _ivm.Open = new RelayCommand(p => { if (p is InboxRow r) OpenUrl(r.Event.Url); });
+            _ivm.MarkRead = new RelayCommand(MarkInboxRead);
+            _ivm.ShowMenu = new RelayCommand(ShowMenuAtCursor);
+            RenderInbox();
+
             _tray = new TrayController(this);
             if (Settings.ShowPanel) ShowPanel();
+            if (Settings.ShowInbox) ShowInbox();
 
             _refreshTimer.Interval = TimeSpan.FromMinutes(Math.Max(1, Settings.RefreshMinutes));
             _refreshTimer.Tick += (_, _) => _ = RefreshAsync();
@@ -172,7 +188,8 @@ namespace ClickUpWidget
                 Task<TimeSpan> finished = _client.GetFinishedTodayAsync(team, DateTime.Now);
                 await Task.WhenAll(tasks, running, finished);
 
-                _tasks = tasks.Result;
+                _allTasks = tasks.Result;
+                _tasks = _allTasks.Where(TaskText.IsOpen).ToList();
                 _running = running.Result;
                 _finishedToday = finished.Result;
                 _dataDay = DateTime.Today;
@@ -180,6 +197,7 @@ namespace ClickUpWidget
                 _vm.Loaded = true;
                 _vm.StateText = "Оновлено о " + _lastOk.Value.ToString("HH:mm");
                 Render();
+                await UpdateInboxAsync();
             }
             catch (ClickUpException ex) when (ex.Unauthorized) { MarkTokenBad(); }
             catch (Exception ex)
@@ -265,6 +283,12 @@ namespace ClickUpWidget
                 _vm.TimerClock = TaskText.FormatClock(now - startLocal);
                 today += now - (startLocal < now.Date ? now.Date : startLocal);
             }
+            if (now.Minute != _lastMinute)
+            {
+                _lastMinute = now.Minute;
+                foreach (InboxRow row in _ivm.Rows) row.TimeText = Inbox.Ago(row.Event.AtMs, now);
+            }
+
             if (_vm.Loaded) _vm.TodayText = "Сьогодні відтрековано · " + TaskText.FormatSpan(today);
 
             string tip = _vm.Loaded ? "ClickUp · задач: " + _tasks.Count : "ClickUp Widget";
@@ -330,6 +354,7 @@ namespace ClickUpWidget
         public async Task SetStatusAsync(TaskItem task, string status)
         {
             if (_client == null) return;
+            _selfStatus[task.Id] = status;
             try
             {
                 await _client.SetStatusAsync(task.Id, status);
@@ -340,6 +365,70 @@ namespace ClickUpWidget
                 Log.Write("Status: " + ex.GetBaseException().Message);
                 _vm.StateText = "Не вдалося змінити статус";
             }
+        }
+
+        // ───────────────────────────── тихий інбокс ─────────────────────────────
+
+        private async Task UpdateInboxAsync()
+        {
+            if (_client == null || Settings.TeamId == null) return;
+            try
+            {
+                if (_inbox.TeamId != Settings.TeamId) _inbox = new InboxState { TeamId = Settings.TeamId };
+
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                (List<InboxEvent> events, List<TaskItem> check) = Inbox.Diff(_inbox, _allTasks, now, _selfStatus);
+
+                // Коментарі тягнемо лише для задач, які змінювались; за раз не більше 15, решта — наступного разу.
+                foreach (TaskItem t in check.Take(15))
+                {
+                    try
+                    {
+                        List<CommentInfo> comments = await _client.GetCommentsAsync(t.Id);
+                        events.AddRange(Inbox.ApplyComments(_inbox, t, comments, _userId));
+                    }
+                    catch (Exception ex) { Log.Write("Comments " + t.Id + ": " + ex.GetBaseException().Message); }
+                }
+
+                Inbox.Add(_inbox, events);
+                Inbox.Save(_inbox);
+                RenderInbox();
+            }
+            catch (Exception ex) { Log.Write("Inbox: " + ex.GetBaseException().Message); }
+        }
+
+        private void RenderInbox()
+        {
+            DateTime now = DateTime.Now;
+            _ivm.Rows.Clear();
+            foreach (InboxEvent e in _inbox.Events)
+                _ivm.Rows.Add(new InboxRow(e) { TimeText = Inbox.Ago(e.AtMs, now), IsUnread = e.AtMs > _inbox.LastReadMs });
+            _ivm.Unread = Inbox.Unread(_inbox);
+            _ivm.IsEmpty = _inbox.Events.Count == 0;
+        }
+
+        private void MarkInboxRead()
+        {
+            long newest = _inbox.Events.Count > 0 ? _inbox.Events.Max(e => e.AtMs) : 0;
+            _inbox.LastReadMs = Math.Max(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), newest);
+            Inbox.Save(_inbox);
+            foreach (InboxRow row in _ivm.Rows) row.IsUnread = false;
+            _ivm.Unread = 0;
+        }
+
+        private void ShowInbox()
+        {
+            if (_inboxWindow != null) return;
+            _inboxWindow = new InboxWindow(this, _ivm);
+            _inboxWindow.Closed += (_, _) => _inboxWindow = null;
+            _inboxWindow.Show();
+        }
+
+        public void SetInboxVisible(bool visible)
+        {
+            Change(s => s.ShowInbox = visible);
+            if (visible) ShowInbox();
+            else _inboxWindow?.Close();
         }
 
         // ───────────────────────────── вікна ─────────────────────────────
@@ -391,6 +480,7 @@ namespace ClickUpWidget
             _statusCache.Clear();
             _running = null;
             _tasks = new List<TaskItem>();
+            _allTasks = new List<TaskItem>();
             Render();
             _ = RefreshAsync();
         }
@@ -406,6 +496,7 @@ namespace ClickUpWidget
             Change(s => s.Theme = light ? "Light" : "Dark");
             Theme.Apply(light);
             Render();   // кольори міток перераховуються під тему
+            RenderInbox();
         }
 
         public void SetAutostart(bool enabled)
@@ -469,6 +560,7 @@ namespace ClickUpWidget
             _updateTimer.Stop();
             _tray?.Dispose();
             _client?.Dispose();
+            Inbox.Save(_inbox);
             Current = null;
         }
     }

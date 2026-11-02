@@ -10,7 +10,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ClickUpWidget</AssemblyName>
     <RootNamespace>ClickUpWidget</RootNamespace>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <Product>ClickUp Widget</Product>
     <Description>Спокійний дашборд задач ClickUp на робочому столі</Description>
     <SatelliteResourceLanguages>uk;en</SatelliteResourceLanguages>

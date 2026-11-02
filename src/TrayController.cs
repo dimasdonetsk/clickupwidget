@@ -86,7 +86,8 @@ namespace ClickUpWidget
             _menu.Items.Add(new WF.ToolStripSeparator());
 
             _menu.Items.Add(Toggle("Панель на робочому столі", s.ShowPanel, v => _app.SetPanelVisible(v)));
-            _menu.Items.Add(Toggle("Закріпити положення панелі", s.LockPanel, v => _app.Change(x => x.LockPanel = v)));
+            _menu.Items.Add(Toggle("Віконце оновлень", s.ShowInbox, v => _app.SetInboxVisible(v)));
+            _menu.Items.Add(Toggle("Закріпити положення віконець", s.LockPanel, v => _app.Change(x => x.LockPanel = v)));
 
             IReadOnlyList<(string Id, string Name)> teams = _app.Teams;
             if (teams.Count > 1)

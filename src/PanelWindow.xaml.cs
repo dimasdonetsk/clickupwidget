@@ -1,15 +1,10 @@
 using System;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Interop;
 
 namespace ClickUpWidget
 {
-    /// <summary>
-    /// Панель на робочому столі: завжди під іншими вікнами, не з'являється на панелі завдань і в Alt+Tab.
-    /// Власник — вікно робочого столу (Progman), тож Win+D її не ховає.
-    /// </summary>
+    /// <summary>Панель задач на робочому столі (під усіма вікнами, див. DesktopPin).</summary>
     public partial class PanelWindow : Window
     {
         private readonly AppController _app;
@@ -27,37 +22,7 @@ namespace ClickUpWidget
         protected override void OnSourceInitialized(EventArgs e)
         {
             base.OnSourceInitialized(e);
-            _hwnd = new WindowInteropHelper(this).Handle;
-            Native.MakeToolWindow(_hwnd);
-
-            IntPtr progman = Native.FindWindow("Progman", null);
-            if (progman != IntPtr.Zero)
-                Native.SetWindowLongPtr(_hwnd, Native.GWLP_HWNDPARENT, progman);
-
-            HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
-            SendToBottom();
-        }
-
-        private IntPtr WndProc(IntPtr h, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-        {
-            // Хоч би що відбувалося (клік, активація) — лишаємося під усіма вікнами.
-            if (msg == Native.WM_WINDOWPOSCHANGING)
-            {
-                var wp = Marshal.PtrToStructure<Native.WINDOWPOS>(lParam);
-                if ((wp.flags & Native.SWP_NOZORDER) == 0)
-                {
-                    wp.hwndInsertAfter = Native.HWND_BOTTOM;
-                    Marshal.StructureToPtr(wp, lParam, false);
-                }
-            }
-            return IntPtr.Zero;
-        }
-
-        private void SendToBottom()
-        {
-            if (_hwnd == IntPtr.Zero) return;
-            Native.SetWindowPos(_hwnd, Native.HWND_BOTTOM, 0, 0, 0, 0,
-                Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+            _hwnd = DesktopPin.Attach(this);
         }
 
         private void PlaceInitial()
@@ -66,12 +31,7 @@ namespace ClickUpWidget
             Rect area = SystemParameters.WorkArea;
             double left = s.PanelLeft ?? area.Right - Width - 8;
             double top = s.PanelTop ?? area.Top + 8;
-
-            // Якщо монітор від'єднали і збережене місце поза екранами — повертаємо на основний.
-            if (left > SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 80
-                || left + Width < SystemParameters.VirtualScreenLeft + 80
-                || top > SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 80
-                || top < SystemParameters.VirtualScreenTop - 20)
+            if (!DesktopPin.OnScreen(left, top, Width))
             {
                 left = area.Right - Width - 8;
                 top = area.Top + 8;
@@ -98,7 +58,7 @@ namespace ClickUpWidget
             _app.Settings.PanelTop = Math.Round(Top);
             _app.Settings.Save();
             UpdateMaxHeight();
-            SendToBottom();
+            DesktopPin.SendToBottom(_hwnd);
         }
 
         protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)

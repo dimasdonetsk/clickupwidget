@@ -21,6 +21,11 @@ namespace ClickUpWidget
         public double? PanelLeft { get; set; }
         public double? PanelTop { get; set; }
 
+        /// <summary>Маленьке віконце оновлень (коментарі й статуси).</summary>
+        public bool ShowInbox { get; set; } = true;
+        public double? InboxLeft { get; set; }
+        public double? InboxTop { get; set; }
+
         public bool Autostart { get; set; } = true;
         /// <summary>Dark (темна) або Light (світла).</summary>
         public string Theme { get; set; } = "Dark";

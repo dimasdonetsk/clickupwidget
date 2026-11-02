@@ -124,4 +124,53 @@ namespace ClickUpWidget
         public ICommand AddToken { get; set; } = new RelayCommand(() => { });
         public ICommand ApplyUpdate { get; set; } = new RelayCommand(() => { });
     }
+
+    /// <summary>Рядок інбоксу.</summary>
+    public sealed class InboxRow : Observable
+    {
+        public InboxEvent Event { get; }
+        public bool IsComment => Event.Kind == "comment";
+        public bool IsStatus => !IsComment;
+        public string Project => Event.Project;
+        public bool HasProject => Event.Project.Length > 0;
+        public Brush ChipBack { get; }
+        public Brush ChipFore { get; }
+        public string Title => Event.Title;
+        public string Who => IsComment ? (Event.Who.Length > 0 ? Event.Who : "Коментар") : "Статус";
+        public string Text => Event.Text;
+        public string FromLabel => TaskText.StatusLabel(Event.From);
+        public string ToLabel => TaskText.StatusLabel(Event.To);
+        public Brush FromBrush { get; }
+        public Brush ToBrush { get; }
+
+        private string _timeText = "";
+        public string TimeText { get => _timeText; set => Set(ref _timeText, value); }
+
+        private bool _isUnread;
+        public bool IsUnread { get => _isUnread; set => Set(ref _isUnread, value); }
+
+        public InboxRow(InboxEvent e)
+        {
+            Event = e;
+            (ChipBack, ChipFore) = Theme.Chip(e.Project);
+            FromBrush = Theme.StatusBrush(e.FromColor);
+            ToBrush = Theme.StatusBrush(e.ToColor);
+        }
+    }
+
+    public sealed class InboxViewModel : Observable
+    {
+        public ObservableCollection<InboxRow> Rows { get; } = new();
+
+        private int _unread;
+        public int Unread { get => _unread; set { if (Set(ref _unread, value)) Raise(nameof(HasUnread)); } }
+        public bool HasUnread => Unread > 0;
+
+        private bool _isEmpty = true;
+        public bool IsEmpty { get => _isEmpty; set => Set(ref _isEmpty, value); }
+
+        public ICommand Open { get; set; } = new RelayCommand(() => { });
+        public ICommand MarkRead { get; set; } = new RelayCommand(() => { });
+        public ICommand ShowMenu { get; set; } = new RelayCommand(() => { });
+    }
 }

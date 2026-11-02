@@ -18,6 +18,8 @@ namespace ClickUpWidget
         public string StatusType { get; init; } = "";
         public int StatusOrder { get; init; }
         public DateTime? Due { get; init; }
+        /// <summary>Коли задачу востаннє змінювали (зокрема новий коментар).</summary>
+        public long UpdatedMs { get; init; }
         public string Url { get; init; } = "";
         public string ListId { get; init; } = "";
     }
@@ -25,6 +27,8 @@ namespace ClickUpWidget
     public sealed record StatusOption(string Name, string? Color, string Type, int Order);
 
     public sealed record RunningTimer(string TaskId, string TaskName, DateTime StartUtc);
+
+    public sealed record CommentInfo(string Id, string Text, long UserId, string UserName, long DateMs);
 
     /// <summary>Чисті правила розбору й форматування (без вікон) — їх покривають тести.</summary>
     public static class TaskText

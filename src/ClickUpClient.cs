@@ -51,7 +51,10 @@ namespace ClickUpWidget
 
         // ───────────────────────────── задачі ─────────────────────────────
 
-        /// <summary>Усі відкриті задачі, призначені на мене, у робочому просторі.</summary>
+        /// <summary>
+        /// Усі незакриті задачі, призначені на мене. Фільтр для показу (беклог, скасовані, done) робить AppController:
+        /// інбоксу потрібні й вони, щоб помітити, що задачу перевели в такий статус.
+        /// </summary>
         public async Task<List<TaskItem>> GetMyTasksAsync(string teamId, long userId)
         {
             var result = new List<TaskItem>();
@@ -64,8 +67,7 @@ namespace ClickUpWidget
                 JsonElement root = doc.RootElement;
                 foreach (JsonElement t in root.GetProperty("tasks").EnumerateArray())
                 {
-                    TaskItem item = ParseTask(t);
-                    if (TaskText.IsOpen(item)) result.Add(item);
+                    result.Add(ParseTask(t));
                 }
                 bool last = !root.TryGetProperty("last_page", out JsonElement lp) || lp.ValueKind != JsonValueKind.False;
                 if (last) break;
@@ -89,6 +91,7 @@ namespace ClickUpWidget
                 StatusType = Str(st, "type") ?? "",
                 StatusOrder = Int(st, "orderindex"),
                 Due = Ms(Str(t, "due_date")),
+                UpdatedMs = long.TryParse(Str(t, "date_updated"), out long upd) ? upd : 0,
                 Url = Str(t, "url") ?? "",
                 ListId = t.TryGetProperty("list", out JsonElement l) ? Str(l, "id") ?? "" : "",
             };
@@ -114,6 +117,28 @@ namespace ClickUpWidget
             };
             using HttpResponseMessage res = await _http.SendAsync(req);
             await EnsureOk(res);
+        }
+
+        /// <summary>Останні коментарі задачі (ClickUp віддає до 25, новіші першими).</summary>
+        public async Task<List<CommentInfo>> GetCommentsAsync(string taskId)
+        {
+            using JsonDocument doc = await GetAsync("task/" + taskId + "/comment");
+            var list = new List<CommentInfo>();
+            if (!doc.RootElement.TryGetProperty("comments", out JsonElement arr) || arr.ValueKind != JsonValueKind.Array)
+                return list;
+            foreach (JsonElement c in arr.EnumerateArray())
+            {
+                long userId = 0;
+                string userName = "";
+                if (c.TryGetProperty("user", out JsonElement u) && u.ValueKind == JsonValueKind.Object)
+                {
+                    long.TryParse(Str(u, "id"), out userId);
+                    userName = Str(u, "username") ?? "";
+                }
+                long.TryParse(Str(c, "date"), out long date);
+                list.Add(new CommentInfo(Str(c, "id") ?? "", (Str(c, "comment_text") ?? "").Trim(), userId, userName, date));
+            }
+            return list;
         }
 
         // ───────────────────────────── трекінг часу ─────────────────────────────
