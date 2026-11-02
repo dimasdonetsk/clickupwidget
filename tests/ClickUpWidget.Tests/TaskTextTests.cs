@@ -73,6 +73,27 @@ namespace ClickUpWidget.Tests
             Assert.True(TaskText.IsOpen(new TaskItem { StatusType = "open" }));
         }
 
+        [Theory]
+        [InlineData("cancelled")]
+        [InlineData("Canceled")]
+        [InlineData("backlog")]
+        [InlineData("BACKLOG")]
+        [InlineData("Скасовано")]
+        public void HidesCancelledAndBacklog(string status)
+        {
+            Assert.False(TaskText.IsOpen(new TaskItem { Status = status, StatusType = "custom" }));
+        }
+
+        [Theory]
+        [InlineData("to do")]
+        [InlineData("in progress")]
+        [InlineData("internal control")]
+        [InlineData("client reviews")]
+        public void KeepsWorkingStatuses(string status)
+        {
+            Assert.True(TaskText.IsOpen(new TaskItem { Status = status, StatusType = "custom" }));
+        }
+
         [Fact]
         public void FormatsTime()
         {

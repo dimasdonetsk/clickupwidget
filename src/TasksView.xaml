@@ -122,15 +122,15 @@
 
         <!-- Рядок задачі -->
         <DataTemplate x:Key="RowTemplate" DataType="{x:Type local:TaskRow}">
-            <Border x:Name="Row" Padding="8,7" CornerRadius="10" Background="Transparent" Cursor="Hand"
+            <!-- Висота рядка і ширина правої колонки фіксовані: при наведенні нічого не стрибає -->
+            <Border x:Name="Row" Padding="8,4" CornerRadius="10" Background="Transparent" Cursor="Hand"
                     ToolTip="{Binding Tooltip}" ToolTipService.InitialShowDelay="900"
                     MouseLeftButtonUp="Row_Click">
-                <Grid>
+                <Grid Height="24">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Ellipse x:Name="Dot" Width="9" Height="9" StrokeThickness="2" VerticalAlignment="Center" Margin="0,0,10,0"
@@ -143,9 +143,11 @@
                     </Border>
                     <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"/>
+                    <!-- Дедлайн і кнопки в одній клітинці: колонка завжди займає ширину більшого з них -->
                     <TextBlock x:Name="Due" Grid.Column="3" Text="{Binding DueText}" FontSize="11.5" Margin="10,0,0,0"
-                               Foreground="{DynamicResource Fg2}" VerticalAlignment="Center"/>
-                    <StackPanel x:Name="Acts" Grid.Column="4" Orientation="Horizontal" Margin="8,0,0,0" Visibility="Collapsed">
+                               Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                    <StackPanel x:Name="Acts" Grid.Column="3" Orientation="Horizontal" Margin="8,0,0,0" Visibility="Hidden"
+                                HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Style="{StaticResource IconButton}" Tag="{Binding}" Click="StatusBtn_Click"
                                 ToolTip="Змінити статус" Content="&#xE70D;"/>
                         <Button x:Name="TimerBtn" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="Запустити таймер"
@@ -160,7 +162,7 @@
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsRunning}" Value="True">
                     <Setter TargetName="Acts" Property="Visibility" Value="Visible"/>
-                    <Setter TargetName="Due" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="Due" Property="Visibility" Value="Hidden"/>
                     <Setter TargetName="TimerBtn" Property="Content" Value="&#xE71A;"/>
                     <Setter TargetName="TimerBtn" Property="ToolTip" Value="Зупинити таймер"/>
                     <Setter TargetName="TimerBtn" Property="Foreground" Value="{DynamicResource TimerFg}"/>
@@ -168,7 +170,7 @@
                 <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
                     <Setter TargetName="Row" Property="Background" Value="{DynamicResource Hover}"/>
                     <Setter TargetName="Acts" Property="Visibility" Value="Visible"/>
-                    <Setter TargetName="Due" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="Due" Property="Visibility" Value="Hidden"/>
                 </Trigger>
             </DataTemplate.Triggers>
         </DataTemplate>

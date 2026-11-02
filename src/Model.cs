@@ -82,10 +82,16 @@ namespace ClickUpWidget
         /// <summary>Дедлайн сьогодні або вже минув.</summary>
         public static bool IsDueNow(DateTime? due, DateTime now) => due != null && due.Value.Date <= now.Date;
 
-        /// <summary>Закриті й виконані статуси у віджеті не показуємо.</summary>
+        /// <summary>Закриті, виконані, скасовані й беклог у віджеті не показуємо.</summary>
         public static bool IsOpen(TaskItem t) =>
             !string.Equals(t.StatusType, "closed", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(t.StatusType, "done", StringComparison.OrdinalIgnoreCase);
+            && !string.Equals(t.StatusType, "done", StringComparison.OrdinalIgnoreCase)
+            && !IsHiddenStatus(t.Status);
+
+        private static readonly string[] HiddenStatuses = { "cancel", "скасов", "відмін", "backlog", "беклог" };
+
+        public static bool IsHiddenStatus(string status) =>
+            HiddenStatuses.Any(h => status.Contains(h, StringComparison.OrdinalIgnoreCase));
 
         /// <summary>Групи за статусом у порядку, як у ClickUp; всередині — за дедлайном.</summary>
         public static List<(string Status, string? Color, List<TaskItem> Tasks)> Group(IEnumerable<TaskItem> tasks)

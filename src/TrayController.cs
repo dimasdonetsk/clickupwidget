@@ -56,7 +56,21 @@ namespace ClickUpWidget
             }
         }
 
-        public void ShowMenuAtCursor() => _menu.Show(WF.Cursor.Position);
+        /// <summary>
+        /// Показати меню біля курсора, але в межах того самого монітора:
+        /// біля правого краю — розкривається вліво, біля низу — вгору (а не на сусідній екран).
+        /// </summary>
+        public void ShowMenuAtCursor()
+        {
+            Point p = WF.Cursor.Position;
+            Rectangle area = WF.Screen.FromPoint(p).WorkingArea;
+            bool left = p.X > area.Left + area.Width / 2;
+            bool above = p.Y > area.Top + area.Height / 2;
+            WF.ToolStripDropDownDirection dir = above
+                ? (left ? WF.ToolStripDropDownDirection.AboveLeft : WF.ToolStripDropDownDirection.AboveRight)
+                : (left ? WF.ToolStripDropDownDirection.BelowLeft : WF.ToolStripDropDownDirection.BelowRight);
+            _menu.Show(p, dir);
+        }
 
         // ───────────────────────────── меню ─────────────────────────────
 
@@ -111,6 +125,14 @@ namespace ClickUpWidget
             _menu.Items.Add(new WF.ToolStripSeparator());
 
             _menu.Items.Add(Item("Вийти", () => _app.Exit()));
+
+            // Підменю теж не мають вилазити на сусідній монітор праворуч.
+            Point cursor = WF.Cursor.Position;
+            Rectangle screen = WF.Screen.FromPoint(cursor).WorkingArea;
+            bool openLeft = cursor.X > screen.Left + screen.Width / 2;
+            foreach (WF.ToolStripItem item in _menu.Items)
+                if (item is WF.ToolStripMenuItem mi && mi.DropDownItems.Count > 0)
+                    mi.DropDownDirection = openLeft ? WF.ToolStripDropDownDirection.Left : WF.ToolStripDropDownDirection.Right;
         }
 
         private static WF.ToolStripMenuItem Item(string text, Action onClick)
