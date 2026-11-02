@@ -50,6 +50,11 @@ namespace ClickUpWidget
         private readonly DispatcherTimer _tickTimer = new() { Interval = TimeSpan.FromSeconds(1) };
         private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromHours(6) };
         private UpdateInfo? _pendingUpdate;
+        private bool _checkingUpdates;
+        /// <summary>До цього моменту нижній рядок не перетирається звичайним «Оновлено о…».</summary>
+        private DateTime _stateStickyUntil;
+
+        public string? PendingUpdateVersion => _pendingUpdate != null ? Updater.VersionOf(_pendingUpdate) : null;
 
         public void Start()
         {
@@ -195,7 +200,7 @@ namespace ClickUpWidget
                 _dataDay = DateTime.Today;
                 _lastOk = DateTime.Now;
                 _vm.Loaded = true;
-                _vm.StateText = "Оновлено о " + _lastOk.Value.ToString("HH:mm");
+                if (DateTime.Now > _stateStickyUntil) _vm.StateText = "Оновлено о " + _lastOk.Value.ToString("HH:mm");
                 Render();
                 await UpdateInboxAsync();
             }
@@ -514,40 +519,84 @@ namespace ClickUpWidget
 
         // ───────────────────────────── оновлення програми ─────────────────────────────
 
-        public void CheckUpdatesManual() => _ = CheckUpdatesAsync(true);
+        /// <summary>Повідомлення в нижньому рядку, яке якийсь час не перетирається.</summary>
+        private void SetState(string text, int stickySeconds)
+        {
+            _vm.StateText = text;
+            _stateStickyUntil = DateTime.Now.AddSeconds(stickySeconds);
+        }
+
+        /// <summary>«Перевірити оновлення» з меню: людина чекає відповіді, тож показуємо кожен крок і одразу ставимо.</summary>
+        public void CheckUpdatesManual()
+        {
+            if (_pendingUpdate != null) { ApplyUpdate(); return; }
+            _ = CheckUpdatesAsync(true);
+        }
 
         private async Task CheckUpdatesAsync(bool manual)
         {
-            if (!Updater.IsInstalled)
+            if (_checkingUpdates)
             {
-                if (manual) _vm.StateText = "Оновлення працюють лише у встановленій версії";
+                if (manual) SetState("Вже перевіряю оновлення…", 60);
                 return;
             }
+            if (!Updater.IsInstalled)
+            {
+                if (manual) SetState("Оновлення працюють лише у встановленій версії", 60);
+                return;
+            }
+
+            _checkingUpdates = true;
             try
             {
+                if (manual) SetState("Перевіряю оновлення…", 120);
                 UpdateInfo? info = await Updater.CheckAsync();
                 if (info == null)
                 {
-                    if (manual) _vm.StateText = "Встановлена остання версія " + Updater.CurrentVersion;
+                    Log.Write("Update: up to date (" + Updater.CurrentVersion + ")");
+                    if (manual) SetState("У тебе остання версія " + Updater.CurrentVersion, 60);
                     return;
                 }
+
+                string version = Updater.VersionOf(info);
+                Log.Write("Update: found " + version);
+                if (manual) SetState("Завантажую " + version + "…", 600);
                 await Updater.DownloadAsync(info);
                 _pendingUpdate = info;
-                // Тихо: без сповіщень, лише рядок унизу панелі.
-                _vm.UpdateText = "Оновити до " + Updater.VersionOf(info) + " ↻";
+                Log.Write("Update: downloaded " + version);
+
+                if (manual)
+                {
+                    SetState("Встановлюю " + version + "…", 60);
+                    ApplyUpdate();   // людина сама попросила — ставимо одразу, програма перезапуститься
+                }
+                else
+                    _vm.UpdateText = "Оновити до " + version + " ↻";   // тихо: лише рядок унизу панелі
             }
             catch (Exception ex)
             {
-                Log.Write("Update: " + ex.Message);
-                if (manual) _vm.StateText = "Не вдалося перевірити оновлення";
+                Log.Write("Update: " + ex);
+                if (manual) SetState("Не вдалося перевірити оновлення", 60);
+            }
+            finally
+            {
+                _checkingUpdates = false;
             }
         }
 
         private void ApplyUpdate()
         {
             if (_pendingUpdate == null) return;
-            try { Updater.ApplyAndRestart(_pendingUpdate); }
-            catch (Exception ex) { Log.Write("Apply update: " + ex.Message); }
+            try
+            {
+                Inbox.Save(_inbox);
+                Updater.ApplyAndRestart(_pendingUpdate);
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Apply update: " + ex);
+                SetState("Не вдалося встановити оновлення", 60);
+            }
         }
 
         public void Exit() => Application.Current.Shutdown();

@@ -120,7 +120,9 @@ namespace ClickUpWidget
 
             string who = _app.UserName.Length > 0 ? "   ·  " + _app.UserName : "";
             _menu.Items.Add(Item((s.TokenEnc == null ? "Підключити ClickUp…" : "Змінити токен…") + who, () => _app.ShowTokenWindow()));
-            _menu.Items.Add(Item("Перевірити оновлення", () => _app.CheckUpdatesManual()));
+            string? pending = _app.PendingUpdateVersion;
+            _menu.Items.Add(Item(pending != null ? "Оновити до " + pending + " і перезапустити" : "Перевірити оновлення",
+                () => _app.CheckUpdatesManual()));
             _menu.Items.Add(Info("Версія " + Updater.CurrentVersion));
             _menu.Items.Add(Item("Відкрити папку налаштувань", () => Open(Settings.DataDir)));
             _menu.Items.Add(new WF.ToolStripSeparator());
