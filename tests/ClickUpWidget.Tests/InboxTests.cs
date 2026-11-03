@@ -49,13 +49,102 @@ namespace ClickUpWidget.Tests
         }
 
         [Fact]
-        public void NewAssignmentIsNotAnEvent()
+        public void NewTaskInMyListIsAnAssignment()
         {
             InboxState state = Seeded(T("a", "to do", 100));
             var (events, check) = Inbox.Diff(state, new[] { T("a", "to do", 100), T("new", "to do", 1700) }, 2000, new Dictionary<string, string>());
-            Assert.Empty(events);
+            InboxEvent e = Assert.Single(events);
+            Assert.Equal(Inbox.KindAssigned, e.Kind);
+            Assert.Equal("new", e.TaskId);
             Assert.Empty(check);
             Assert.True(state.Tasks.ContainsKey("new"));
+        }
+
+        [Fact]
+        public void AssignmentsAreHiddenByDefault()
+        {
+            var s = new Settings();
+            Assert.False(s.InboxShows(new InboxEvent { Kind = Inbox.KindAssigned }));
+            Assert.True(s.InboxShows(new InboxEvent { Kind = Inbox.KindComment }));
+            Assert.False(s.InboxShows(new InboxEvent { Kind = Inbox.KindComment, Mine = true }));
+            Assert.True(s.InboxShows(new InboxEvent { Kind = Inbox.KindDue }));
+        }
+
+        private static TaskItem Full(string id, string name, DateTime? due = null, string? priority = null, params Person[] assignees) =>
+            new()
+            {
+                Id = id, RawName = name, Title = TaskText.Split(name).Title, Project = TaskText.Split(name).Project,
+                Status = "to do", StatusType = "custom", UpdatedMs = 100, Due = due, Priority = priority, Assignees = assignees,
+            };
+
+        private static readonly Person Me = new(42, "Я", "", null, "Я");
+        private static readonly Person Olena = new(7, "Олена", "", null, "О");
+        private static readonly Person Petro = new(8, "Петро", "", null, "П");
+
+        [Fact]
+        public void DetectsDuePriorityRenameAndAssignees()
+        {
+            var state = new InboxState();
+            var self = new Dictionary<string, string>();
+            Inbox.Diff(state, new[] { Full("a", "АП: Банер - верстка", new DateTime(2026, 11, 5), "normal", Me, Olena) }, 1000, self, Me.Id);
+
+            TaskItem changed = Full("a", "АП: Банер НП - верстка", new DateTime(2026, 11, 7), "urgent", Me, Petro);
+            InboxDiff diff = Inbox.Diff(state, new[] { changed }, 2000, self, Me.Id);
+
+            Assert.Equal(new[] { Inbox.KindDue, Inbox.KindPriority, Inbox.KindRenamed, Inbox.KindAssignees },
+                diff.Events.Select(e => e.Kind));
+            InboxEvent due = diff.Events[0];
+            Assert.Equal("5 лис", due.From);
+            Assert.Equal("7 лис", due.To);
+            Assert.Equal("Звичайний", diff.Events[1].From);
+            Assert.Equal("Терміновий", diff.Events[1].To);
+            Assert.Equal("Було: Банер — верстка", diff.Events[2].Text);
+            Assert.Equal("+ Петро · − Олена", diff.Events[3].Text);
+
+            // Той самий стан вдруге — нових подій немає.
+            Assert.Empty(Inbox.Diff(state, new[] { changed }, 3000, self, Me.Id).Events);
+        }
+
+        [Fact]
+        public void OldStateIsUpgradedSilently()
+        {
+            // Запис зі старої версії: без назви, дедлайну, пріоритету й виконавців.
+            var state = new InboxState { Seeded = true };
+            state.Tasks["a"] = new SeenTask { Status = "to do", UpdatedMs = 100 };
+            TaskItem t = Full("a", "GM: Лист", new DateTime(2026, 11, 9), "high", Me, Olena);
+
+            Assert.Empty(Inbox.Diff(state, new[] { t }, 2000, new Dictionary<string, string>(), Me.Id).Events);
+            Assert.True(state.Tasks["a"].Full);
+
+            TaskItem later = Full("a", "GM: Лист", new DateTime(2026, 11, 10), "high", Me, Olena);
+            Assert.Equal(Inbox.KindDue, Assert.Single(Inbox.Diff(state, new[] { later }, 3000, new Dictionary<string, string>(), Me.Id).Events).Kind);
+        }
+
+        [Fact]
+        public void GoneTasksAreResolved()
+        {
+            var self = new Dictionary<string, string>();
+            var state = new InboxState();
+            Inbox.Diff(state, new[] { Full("closed", "АП: Один"), Full("unassigned", "АП: Два"), Full("deleted", "АП: Три"), Full("mine", "АП: Чотири") },
+                1000, self, Me.Id);
+            InboxDiff diff = Inbox.Diff(state, Array.Empty<TaskItem>(), 2000, self, Me.Id);
+            Assert.Equal(4, diff.Gone.Count);
+
+            var closed = new TaskItem { Id = "closed", Title = "Один", Status = "done", StatusType = "closed", Assignees = new[] { Me } };
+            Assert.Equal(Inbox.KindClosed, Inbox.ResolveGone(state, "closed", closed, Me.Id, 2000, self)!.Kind);
+
+            var other = new TaskItem { Id = "unassigned", Title = "Два", Status = "to do", StatusType = "custom", Assignees = new[] { Olena } };
+            Assert.Equal(Inbox.KindUnassigned, Inbox.ResolveGone(state, "unassigned", other, Me.Id, 2000, self)!.Kind);
+
+            InboxEvent deleted = Inbox.ResolveGone(state, "deleted", null, Me.Id, 2000, self)!;
+            Assert.Equal(Inbox.KindDeleted, deleted.Kind);
+            Assert.Equal("Три", deleted.Title);
+
+            // Я сам закрив задачу через віджет — без події.
+            self["mine"] = "done";
+            var mine = new TaskItem { Id = "mine", Status = "done", StatusType = "closed", Assignees = new[] { Me } };
+            Assert.Null(Inbox.ResolveGone(state, "mine", mine, Me.Id, 2000, self));
+            Assert.Empty(state.Tasks);
         }
 
         [Fact]
@@ -67,7 +156,7 @@ namespace ClickUpWidget.Tests
         }
 
         [Fact]
-        public void OnlyNewCommentsFromOthers()
+        public void OnlyNewCommentsAndMineFlagged()
         {
             InboxState state = Seeded(T("a", "to do", 100));      // запам'ятовано на 1000
             var comments = new[]
@@ -78,14 +167,27 @@ namespace ClickUpWidget.Tests
             };
             List<InboxEvent> events = Inbox.ApplyComments(state, T("a", "to do", 1500), comments, myUserId: 42);
 
-            InboxEvent e = Assert.Single(events);
+            Assert.Equal(2, events.Count);
+            InboxEvent e = events[0];
             Assert.Equal("Олена", e.Who);
+            Assert.Equal(7, e.WhoId);
             Assert.Equal("Поправ банер будь ласка", e.Text);
+            Assert.False(e.Mine);
+            Assert.True(events[1].Mine);      // власний коментар записано, але за замовчуванням не показується
             Assert.Equal(1450, state.Tasks["a"].LastCommentMs);
             Assert.Equal(1500, state.Tasks["a"].UpdatedMs);
 
             // Повторне читання тих самих коментарів нічого не додає.
             Assert.Empty(Inbox.ApplyComments(state, T("a", "to do", 1500), comments, 42));
+        }
+
+        [Fact]
+        public void MentionOfMeIsSeparateKind()
+        {
+            InboxState state = Seeded(T("a", "to do", 100));
+            var comments = new[] { new CommentInfo("9", "@Я глянь", 7, "Олена", 1400, new long[] { 42 }) };
+            InboxEvent e = Assert.Single(Inbox.ApplyComments(state, T("a", "to do", 1500), comments, 42));
+            Assert.Equal(Inbox.KindMention, e.Kind);
         }
 
         [Fact]

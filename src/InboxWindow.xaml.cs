@@ -55,8 +55,22 @@ namespace ClickUpWidget
 
         private void Row_Click(object sender, MouseButtonEventArgs e)
         {
+            // Кліки по кнопках і по полю коментаря задачу не відкривають.
+            for (DependencyObject? d = e.OriginalSource as DependencyObject; d != null && d != sender;
+                 d = d is System.Windows.Media.Visual ? System.Windows.Media.VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+                if (d is System.Windows.Controls.Primitives.ButtonBase || d is CommentBox) return;
             if ((sender as FrameworkElement)?.DataContext is InboxRow row)
                 _vm.Open.Execute(row);
+        }
+
+        private void Reply_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is InboxRow row) _app.ToggleComposer(row, replyToAuthor: true);
+        }
+
+        private void Comment_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is InboxRow row) _app.ToggleComposer(row);
         }
 
         protected override void OnMouseRightButtonUp(MouseButtonEventArgs e)

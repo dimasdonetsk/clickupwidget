@@ -30,9 +30,43 @@ namespace ClickUpWidget
         // …у флайауті з трею
         public bool FlyoutShowTimer { get; set; } = true;
         public bool FlyoutShowDue { get; set; } = true;
-        // …в інбоксі
+        // …в рядку задачі
+        public bool RowShowProject { get; set; } = true;
+        public bool RowShowDue { get; set; } = true;
+        public bool RowShowPriority { get; set; }
+        // …в інбоксі (кожен тип подій окремо)
         public bool InboxComments { get; set; } = true;
+        public bool InboxMentions { get; set; } = true;
         public bool InboxStatuses { get; set; } = true;
+        /// <summary>Нова задача на мене. За замовчуванням вимкнено — призначення відволікають.</summary>
+        public bool InboxAssigned { get; set; }
+        public bool InboxUnassigned { get; set; } = true;
+        public bool InboxClosed { get; set; } = true;
+        public bool InboxDue { get; set; } = true;
+        public bool InboxPriority { get; set; } = true;
+        public bool InboxRenamed { get; set; } = true;
+        public bool InboxAssignees { get; set; } = true;
+        public bool InboxOwnComments { get; set; }
+
+        /// <summary>Чи показувати подію інбоксу за налаштуваннями.</summary>
+        public bool InboxShows(InboxEvent e)
+        {
+            if (e.Mine) return InboxOwnComments;
+            return e.Kind switch
+            {
+                Inbox.KindComment => InboxComments,
+                Inbox.KindMention => InboxMentions || InboxComments,
+                Inbox.KindStatus => InboxStatuses,
+                Inbox.KindAssigned => InboxAssigned,
+                Inbox.KindUnassigned => InboxUnassigned,
+                Inbox.KindClosed or Inbox.KindDeleted => InboxClosed,
+                Inbox.KindDue => InboxDue,
+                Inbox.KindPriority => InboxPriority,
+                Inbox.KindRenamed => InboxRenamed,
+                Inbox.KindAssignees => InboxAssignees,
+                _ => true,
+            };
+        }
 
         /// <summary>
         /// Вибір людини для окремих статусів (назва в нижньому регістрі → показувати чи ні).

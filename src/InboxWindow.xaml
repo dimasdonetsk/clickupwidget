@@ -22,27 +22,38 @@
                     <Ellipse x:Name="NewDot" Width="6" Height="6" Fill="#7AA7FF" VerticalAlignment="Top"
                              HorizontalAlignment="Left" Margin="0,6,0,0" Visibility="Hidden"/>
                     <StackPanel Grid.Column="1">
-                        <Grid>
-                            <TextBlock Text="{Binding Who}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
-                                       Margin="0,0,56,0"/>
-                            <TextBlock Text="{Binding TimeText}" FontSize="11" Foreground="{DynamicResource Fg3}"
-                                       HorizontalAlignment="Right"/>
+                        <!-- Заголовок і час; при наведенні час змінюють кнопки (ширина та сама, нічого не стрибає) -->
+                        <Grid Height="20">
+                            <TextBlock Text="{Binding Header}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,64,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="Time" Text="{Binding TimeText}" FontSize="11" Foreground="{DynamicResource Fg3}"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <StackPanel x:Name="Acts" Orientation="Horizontal" HorizontalAlignment="Right" Visibility="Hidden">
+                                <Button x:Name="ReplyBtn" Style="{StaticResource IconButton}" Width="22" Height="20" Tag="{Binding}"
+                                        Click="Reply_Click" ToolTip="Відповісти" Content="&#xE97A;"/>
+                                <Button Style="{StaticResource IconButton}" Width="22" Height="20" Margin="5,0,0,0" Tag="{Binding}"
+                                        Click="Comment_Click" ToolTip="Залишити коментар у задачі" Content="&#xE8BD;"/>
+                            </StackPanel>
                         </Grid>
 
-                        <!-- Коментар: до двох рядків -->
+                        <!-- Текст: коментар до двох рядків, або опис зміни -->
                         <TextBlock Text="{Binding Text}" FontSize="12.5" Foreground="{DynamicResource Fg2}" Margin="0,3,0,0"
                                    TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="36"
-                                   Visibility="{Binding IsComment, Converter={StaticResource Vis}}"/>
+                                   Visibility="{Binding HasText, Converter={StaticResource Vis}}"/>
 
-                        <!-- Статус: було → стало -->
+                        <!-- Було → стало -->
                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
-                                    Visibility="{Binding IsStatus, Converter={StaticResource Vis}}">
-                            <Ellipse Width="8" Height="8" StrokeThickness="2" Stroke="{Binding FromBrush}" Fill="{Binding FromBrush}"
-                                     VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBlock Text="{Binding FromLabel}" FontSize="12.5" Foreground="{DynamicResource Fg2}"/>
-                            <TextBlock Text="→" FontSize="12.5" Foreground="{DynamicResource Fg3}" Margin="7,0,7,0"/>
+                                    Visibility="{Binding ShowChange, Converter={StaticResource Vis}}">
+                            <StackPanel Orientation="Horizontal" Visibility="{Binding HasFrom, Converter={StaticResource Vis}}">
+                                <Ellipse Width="8" Height="8" StrokeThickness="2" Stroke="{Binding FromBrush}" Fill="{Binding FromBrush}"
+                                         VerticalAlignment="Center" Margin="0,0,6,0"
+                                         Visibility="{Binding ShowDots, Converter={StaticResource Vis}}"/>
+                                <TextBlock Text="{Binding FromLabel}" FontSize="12.5" Foreground="{DynamicResource Fg2}"/>
+                                <TextBlock Text="→" FontSize="12.5" Foreground="{DynamicResource Fg3}" Margin="7,0,7,0"/>
+                            </StackPanel>
                             <Ellipse Width="8" Height="8" StrokeThickness="2" Stroke="{Binding ToBrush}" Fill="{Binding ToBrush}"
-                                     VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                     VerticalAlignment="Center" Margin="0,0,6,0"
+                                     Visibility="{Binding ShowDots, Converter={StaticResource Vis}}"/>
                             <TextBlock Text="{Binding ToLabel}" FontSize="12.5"/>
                         </StackPanel>
 
@@ -59,6 +70,8 @@
                             <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="11.5" Foreground="{DynamicResource Fg3}"
                                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                         </Grid>
+
+                        <ContentPresenter Content="{Binding Composer}"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -66,8 +79,17 @@
                 <DataTrigger Binding="{Binding IsUnread}" Value="True">
                     <Setter TargetName="NewDot" Property="Visibility" Value="Visible"/>
                 </DataTrigger>
+                <DataTrigger Binding="{Binding CanReply}" Value="False">
+                    <Setter TargetName="ReplyBtn" Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsComposing}" Value="True">
+                    <Setter TargetName="Row" Property="Background" Value="{DynamicResource Hover}"/>
+                    <Setter TargetName="Row" Property="Cursor" Value="Arrow"/>
+                </DataTrigger>
                 <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
                     <Setter TargetName="Row" Property="Background" Value="{DynamicResource Hover}"/>
+                    <Setter TargetName="Acts" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="Time" Property="Visibility" Value="Hidden"/>
                 </Trigger>
             </DataTemplate.Triggers>
         </DataTemplate>

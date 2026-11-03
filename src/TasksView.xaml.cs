@@ -83,13 +83,18 @@ namespace ClickUpWidget
         private void Row_Click(object sender, MouseButtonEventArgs e)
         {
             for (DependencyObject? d = e.OriginalSource as DependencyObject; d != null && d != sender; d = ParentOf(d))
-                if (d is ButtonBase) return;
+                if (d is ButtonBase || d is CommentBox) return;
             if ((sender as FrameworkElement)?.DataContext is TaskRow row)
                 _vm?.OpenTask.Execute(row);
         }
 
         private static DependencyObject? ParentOf(DependencyObject d) =>
             d is Visual || d is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+
+        private void CommentBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is IComposerHost host) AppController.Current?.ToggleComposer(host);
+        }
 
         // ───────────────────────────── меню статусів ─────────────────────────────
 

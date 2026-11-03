@@ -46,6 +46,13 @@ namespace ClickUpWidget
         /// <summary>Застосувати оновлення і перезапустити програму. Поточний процес завершиться.</summary>
         public static void ApplyAndRestart(UpdateInfo info) => Manager.ApplyUpdatesAndRestart(info.TargetFullRelease);
 
+        /// <summary>
+        /// Тихе оновлення: оновлювач чекає, поки програма закриється, ставить нову версію без жодних вікон
+        /// і запускає її знову. Після виклику програму треба закрити.
+        /// </summary>
+        public static void ApplySilentlyOnExit(UpdateInfo info) =>
+            Manager.WaitExitThenApplyUpdates(info.TargetFullRelease, silent: true, restart: true, restartArgs: new[] { "--updated" });
+
         public static string VersionOf(UpdateInfo info) => info.TargetFullRelease.Version.ToString();
     }
 }

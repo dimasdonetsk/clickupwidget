@@ -22,13 +22,21 @@ namespace ClickUpWidget
         public long UpdatedMs { get; init; }
         public string Url { get; init; } = "";
         public string ListId { get; init; } = "";
+        /// <summary>urgent, high, normal, low або null.</summary>
+        public string? Priority { get; init; }
+        public string? PriorityColor { get; init; }
+        public IReadOnlyList<Person> Assignees { get; init; } = Array.Empty<Person>();
     }
+
+    /// <summary>Людина в робочому просторі (для виконавців і @згадок).</summary>
+    public sealed record Person(long Id, string Name, string Email, string? Color, string Initials);
 
     public sealed record StatusOption(string Name, string? Color, string Type, int Order);
 
     public sealed record RunningTimer(string TaskId, string TaskName, DateTime StartUtc);
 
-    public sealed record CommentInfo(string Id, string Text, long UserId, string UserName, long DateMs);
+    /// <summary>Коментар; Tagged — кого в ньому згадали через @.</summary>
+    public sealed record CommentInfo(string Id, string Text, long UserId, string UserName, long DateMs, IReadOnlyList<long>? Tagged = null);
 
     /// <summary>Чисті правила розбору й форматування (без вікон) — їх покривають тести.</summary>
     public static class TaskText
@@ -145,6 +153,24 @@ namespace ClickUpWidget
             if (span < TimeSpan.Zero) span = TimeSpan.Zero;
             return ((int)span.TotalHours).ToString("00") + ":" + span.Minutes.ToString("00") + ":" + span.Seconds.ToString("00");
         }
+
+        /// <summary>Дата без часу: «5 лис»; 0 — «без дедлайну».</summary>
+        public static string FormatDate(long ms)
+        {
+            if (ms <= 0) return "без дедлайну";
+            DateTime d = DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime;
+            return d.Day + " " + Months[d.Month - 1];
+        }
+
+        public static string PriorityLabel(string? priority) => (priority ?? "").ToLowerInvariant() switch
+        {
+            "urgent" => "Терміновий",
+            "high" => "Високий",
+            "normal" => "Звичайний",
+            "low" => "Низький",
+            "" => "Без пріоритету",
+            _ => StatusLabel(priority!),
+        };
 
         public static string StatusLabel(string status) =>
             status.Length == 0 ? status : char.ToUpper(status[0], Uk) + status.Substring(1);

@@ -44,6 +44,32 @@ namespace ClickUpWidget
 
         [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr handle);
 
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr pid);
+        [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+        [DllImport("user32.dll")] private static extern IntPtr SetFocus(IntPtr hWnd);
+
+        /// <summary>Зробити вікно активним, щоб у нього можна було друкувати (навіть якщо фокус зараз у Провідника).</summary>
+        public static void ForceForeground(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero) return;
+            IntPtr fg = GetForegroundWindow();
+            if (fg == hwnd) return;
+            uint fgThread = GetWindowThreadProcessId(fg, IntPtr.Zero);
+            uint me = GetCurrentThreadId();
+            bool attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
+            try
+            {
+                SetForegroundWindow(hwnd);
+                SetFocus(hwnd);
+            }
+            finally
+            {
+                if (attached) AttachThreadInput(me, fgThread, false);
+            }
+        }
+
         public static void MakeToolWindow(IntPtr hwnd) =>
             SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW);
 

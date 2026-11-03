@@ -161,6 +161,11 @@ namespace ClickUpWidget
             panel.DropDownItems.Add(Keep("Таймер", s.ShowTimer, v => _app.SetDisplay(x => x.ShowTimer = v)));
             panel.DropDownItems.Add(Keep("Сьогодні (дедлайни)", s.ShowDueSection, v => _app.SetDisplay(x => x.ShowDueSection = v)));
             panel.DropDownItems.Add(Keep("Усі відкриті задачі", s.ShowAllSection, v => _app.SetDisplay(x => x.ShowAllSection = v)));
+            panel.DropDownItems.Add(new WF.ToolStripSeparator());
+            panel.DropDownItems.Add(Info("У рядку задачі"));
+            panel.DropDownItems.Add(Keep("Мітка проєкту", s.RowShowProject, v => _app.SetDisplay(x => x.RowShowProject = v)));
+            panel.DropDownItems.Add(Keep("Дедлайн", s.RowShowDue, v => _app.SetDisplay(x => x.RowShowDue = v)));
+            panel.DropDownItems.Add(Keep("Пріоритет (прапорець)", s.RowShowPriority, v => _app.SetDisplay(x => x.RowShowPriority = v)));
             root.DropDownItems.Add(panel);
 
             var flyout = Sub("Картка з трею");
@@ -170,7 +175,18 @@ namespace ClickUpWidget
 
             var inbox = Sub("Віконце оновлень");
             inbox.DropDownItems.Add(Keep("Коментарі", s.InboxComments, v => _app.SetDisplay(x => x.InboxComments = v)));
+            inbox.DropDownItems.Add(Keep("Згадки мене (@)", s.InboxMentions, v => _app.SetDisplay(x => x.InboxMentions = v)));
+            inbox.DropDownItems.Add(Keep("Мої власні коментарі", s.InboxOwnComments, v => _app.SetDisplay(x => x.InboxOwnComments = v)));
+            inbox.DropDownItems.Add(new WF.ToolStripSeparator());
             inbox.DropDownItems.Add(Keep("Зміни статусів", s.InboxStatuses, v => _app.SetDisplay(x => x.InboxStatuses = v)));
+            inbox.DropDownItems.Add(Keep("Закриті й видалені задачі", s.InboxClosed, v => _app.SetDisplay(x => x.InboxClosed = v)));
+            inbox.DropDownItems.Add(Keep("Зміни дедлайну", s.InboxDue, v => _app.SetDisplay(x => x.InboxDue = v)));
+            inbox.DropDownItems.Add(Keep("Зміни пріоритету", s.InboxPriority, v => _app.SetDisplay(x => x.InboxPriority = v)));
+            inbox.DropDownItems.Add(Keep("Перейменування", s.InboxRenamed, v => _app.SetDisplay(x => x.InboxRenamed = v)));
+            inbox.DropDownItems.Add(new WF.ToolStripSeparator());
+            inbox.DropDownItems.Add(Keep("Нові задачі на мене (призначення)", s.InboxAssigned, v => _app.SetDisplay(x => x.InboxAssigned = v)));
+            inbox.DropDownItems.Add(Keep("Мене прибрали з задачі", s.InboxUnassigned, v => _app.SetDisplay(x => x.InboxUnassigned = v)));
+            inbox.DropDownItems.Add(Keep("Зміни інших виконавців", s.InboxAssignees, v => _app.SetDisplay(x => x.InboxAssignees = v)));
             root.DropDownItems.Add(inbox);
             root.DropDownItems.Add(new WF.ToolStripSeparator());
 

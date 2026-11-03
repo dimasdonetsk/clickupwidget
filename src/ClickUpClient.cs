@@ -40,13 +40,43 @@ namespace ClickUpWidget
             return (u.GetProperty("id").GetInt64(), Str(u, "username") ?? "");
         }
 
-        public async Task<List<(string Id, string Name)>> GetTeamsAsync()
+        /// <summary>Робочі простори з учасниками (учасники потрібні для @згадок).</summary>
+        public async Task<List<(string Id, string Name, List<Person> Members)>> GetTeamsAsync()
         {
             using JsonDocument doc = await GetAsync("team");
-            var list = new List<(string, string)>();
+            var list = new List<(string, string, List<Person>)>();
             foreach (JsonElement t in doc.RootElement.GetProperty("teams").EnumerateArray())
-                list.Add((Str(t, "id") ?? "", Str(t, "name") ?? ""));
+            {
+                var members = new List<Person>();
+                if (t.TryGetProperty("members", out JsonElement ms) && ms.ValueKind == JsonValueKind.Array)
+                    foreach (JsonElement m in ms.EnumerateArray())
+                        if (m.TryGetProperty("user", out JsonElement u) && ParsePerson(u) is { } p)
+                            members.Add(p);
+                list.Add((Str(t, "id") ?? "", Str(t, "name") ?? "", members));
+            }
             return list;
+        }
+
+        /// <summary>Учасники задачі (виконавці й ті, хто стежить) — їх показуємо першими в списку @згадок.</summary>
+        public async Task<List<Person>> GetTaskMembersAsync(string taskId)
+        {
+            using JsonDocument doc = await GetAsync("task/" + taskId + "/member");
+            var list = new List<Person>();
+            if (doc.RootElement.TryGetProperty("members", out JsonElement arr) && arr.ValueKind == JsonValueKind.Array)
+                foreach (JsonElement u in arr.EnumerateArray())
+                    if (ParsePerson(u) is { } p) list.Add(p);
+            return list;
+        }
+
+        internal static Person? ParsePerson(JsonElement u)
+        {
+            if (u.ValueKind != JsonValueKind.Object || !long.TryParse(Str(u, "id"), out long id) || id <= 0) return null;
+            string name = Str(u, "username") ?? "";
+            string email = Str(u, "email") ?? "";
+            if (name.Length == 0) name = email.Length > 0 ? email.Split('@')[0] : "#" + id;
+            string initials = Str(u, "initials") ?? "";
+            if (initials.Length == 0) initials = name.Substring(0, 1).ToUpperInvariant();
+            return new Person(id, name, email, Str(u, "color"), initials);
         }
 
         // ───────────────────────────── задачі ─────────────────────────────
@@ -94,7 +124,30 @@ namespace ClickUpWidget
                 UpdatedMs = long.TryParse(Str(t, "date_updated"), out long upd) ? upd : 0,
                 Url = Str(t, "url") ?? "",
                 ListId = t.TryGetProperty("list", out JsonElement l) ? Str(l, "id") ?? "" : "",
+                Priority = t.TryGetProperty("priority", out JsonElement pr) && pr.ValueKind == JsonValueKind.Object ? Str(pr, "priority") : null,
+                PriorityColor = t.TryGetProperty("priority", out JsonElement pc) && pc.ValueKind == JsonValueKind.Object ? Str(pc, "color") : null,
+                Assignees = ParsePeople(t, "assignees"),
             };
+        }
+
+        private static List<Person> ParsePeople(JsonElement e, string name)
+        {
+            var list = new List<Person>();
+            if (e.TryGetProperty(name, out JsonElement arr) && arr.ValueKind == JsonValueKind.Array)
+                foreach (JsonElement u in arr.EnumerateArray())
+                    if (ParsePerson(u) is { } p) list.Add(p);
+            return list;
+        }
+
+        /// <summary>Одна задача (щоб дізнатися, що з нею, коли вона зникла з мого списку). null — задачу видалено.</summary>
+        public async Task<TaskItem?> GetTaskAsync(string taskId)
+        {
+            using HttpResponseMessage res = await _http.GetAsync("task/" + taskId);
+            if (res.StatusCode == HttpStatusCode.NotFound) return null;
+            await EnsureOk(res);
+            await using var stream = await res.Content.ReadAsStreamAsync();
+            using JsonDocument doc = await JsonDocument.ParseAsync(stream);
+            return ParseTask(doc.RootElement);
         }
 
         /// <summary>Статуси списку, до якого належить задача (для меню зміни статусу).</summary>
@@ -136,9 +189,34 @@ namespace ClickUpWidget
                     userName = Str(u, "username") ?? "";
                 }
                 long.TryParse(Str(c, "date"), out long date);
-                list.Add(new CommentInfo(Str(c, "id") ?? "", (Str(c, "comment_text") ?? "").Trim(), userId, userName, date));
+                var tagged = new List<long>();
+                if (c.TryGetProperty("comment", out JsonElement parts) && parts.ValueKind == JsonValueKind.Array)
+                    foreach (JsonElement part in parts.EnumerateArray())
+                        if (part.ValueKind == JsonValueKind.Object && Str(part, "type") == "tag"
+                            && part.TryGetProperty("user", out JsonElement tu) && tu.ValueKind == JsonValueKind.Object
+                            && long.TryParse(Str(tu, "id"), out long tid))
+                            tagged.Add(tid);
+                list.Add(new CommentInfo(Str(c, "id") ?? "", (Str(c, "comment_text") ?? "").Trim(), userId, userName, date, tagged));
             }
             return list;
+        }
+
+        /// <summary>Новий коментар. Згадки (@) йдуть окремими частинами типу tag — так ClickUp надсилає людині сповіщення.</summary>
+        public async Task PostCommentAsync(string taskId, IReadOnlyList<CommentPart> parts)
+        {
+            var comment = new List<object>();
+            foreach (CommentPart p in parts)
+            {
+                if (p.UserId is long id) comment.Add(new Dictionary<string, object> { ["type"] = "tag", ["user"] = new { id } });
+                else if (!string.IsNullOrEmpty(p.Text)) comment.Add(new { text = p.Text });
+            }
+            string body = JsonSerializer.Serialize(new { comment, notify_all = false });
+            using var req = new HttpRequestMessage(HttpMethod.Post, "task/" + taskId + "/comment")
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            };
+            using HttpResponseMessage res = await _http.SendAsync(req);
+            await EnsureOk(res);
         }
 
         // ───────────────────────────── трекінг часу ─────────────────────────────

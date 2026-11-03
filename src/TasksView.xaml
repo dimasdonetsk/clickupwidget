@@ -11,41 +11,58 @@
         <DataTemplate x:Key="RowTemplate" DataType="{x:Type local:TaskRow}">
             <!-- Висота рядка і ширина правої колонки фіксовані: при наведенні нічого не стрибає -->
             <Border x:Name="Row" Padding="8,4" CornerRadius="10" Background="Transparent" Cursor="Hand"
-                    ToolTip="{Binding Tooltip}" ToolTipService.InitialShowDelay="900"
                     MouseLeftButtonUp="Row_Click">
-                <Grid Height="24">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Ellipse x:Name="Dot" Width="9" Height="9" StrokeThickness="2" VerticalAlignment="Center" Margin="0,0,10,0"
-                             Stroke="{Binding StatusBrush}" Fill="{Binding StatusBrush}"/>
-                    <Border Grid.Column="1" Background="{Binding ChipBack}" CornerRadius="6" Padding="6,1,6,2" Margin="0,0,10,0"
-                            VerticalAlignment="Center" MinWidth="30"
-                            Visibility="{Binding HasProject, Converter={StaticResource Vis}}">
-                        <TextBlock Text="{Binding Project}" Foreground="{Binding ChipFore}" FontSize="10.5" FontWeight="Bold"
-                                   HorizontalAlignment="Center"/>
-                    </Border>
-                    <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center"/>
-                    <!-- Дедлайн і кнопки в одній клітинці: колонка завжди займає ширину більшого з них -->
-                    <TextBlock x:Name="Due" Grid.Column="3" Text="{Binding DueText}" FontSize="11.5" Margin="10,0,0,0"
-                               Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                    <StackPanel x:Name="Acts" Grid.Column="3" Orientation="Horizontal" Margin="8,0,0,0" Visibility="Hidden"
-                                HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Button Style="{StaticResource IconButton}" Tag="{Binding}" Click="StatusBtn_Click"
-                                ToolTip="Змінити статус" Content="&#xE70D;"/>
-                        <Button x:Name="TimerBtn" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="Запустити таймер"
-                                Command="{Binding DataContext.ToggleTimer, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}" Content="&#xE768;"/>
-                    </StackPanel>
-                </Grid>
+                <StackPanel>
+                    <Grid Height="24" ToolTip="{Binding Tooltip}" ToolTipService.InitialShowDelay="900">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Ellipse x:Name="Dot" Width="9" Height="9" StrokeThickness="2" VerticalAlignment="Center" Margin="0,0,10,0"
+                                 Stroke="{Binding StatusBrush}" Fill="{Binding StatusBrush}"/>
+                        <Border Grid.Column="1" Background="{Binding ChipBack}" CornerRadius="6" Padding="6,1,6,2" Margin="0,0,10,0"
+                                VerticalAlignment="Center" MinWidth="30"
+                                Visibility="{Binding HasProject, Converter={StaticResource Vis}}">
+                            <TextBlock Text="{Binding Project}" Foreground="{Binding ChipFore}" FontSize="10.5" FontWeight="Bold"
+                                       HorizontalAlignment="Center"/>
+                        </Border>
+                        <!-- Пріоритет: маленький прапорець (вмикається в «Що показувати») -->
+                        <TextBlock Grid.Column="2" Text="&#xE7C1;" FontFamily="{StaticResource Icons}" FontSize="11"
+                                   Foreground="{Binding PriorityBrush}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                   ToolTip="{Binding PriorityText}"
+                                   Visibility="{Binding HasPriority, Converter={StaticResource Vis}}"/>
+                        <TextBlock Grid.Column="3" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+                        <!-- Дедлайн і кнопки в одній клітинці: колонка завжди займає ширину більшого з них -->
+                        <TextBlock x:Name="Due" Grid.Column="4" Text="{Binding DueText}" FontSize="11.5" Margin="10,0,0,0"
+                                   Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                        <StackPanel x:Name="Acts" Grid.Column="4" Orientation="Horizontal" Margin="8,0,0,0" Visibility="Hidden"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Style="{StaticResource IconButton}" Tag="{Binding}" Click="CommentBtn_Click"
+                                    ToolTip="Залишити коментар" Content="&#xE8BD;"/>
+                            <Button Style="{StaticResource IconButton}" Tag="{Binding}" Click="StatusBtn_Click" Margin="6,0,0,0"
+                                    ToolTip="Змінити статус" Content="&#xE70D;"/>
+                            <Button x:Name="TimerBtn" Style="{StaticResource IconButton}" Margin="6,0,0,0" ToolTip="Запустити таймер"
+                                    Command="{Binding DataContext.ToggleTimer, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}" Content="&#xE768;"/>
+                        </StackPanel>
+                    </Grid>
+                    <ContentPresenter Content="{Binding Composer}"/>
+                </StackPanel>
             </Border>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding Hollow}" Value="True">
                     <Setter TargetName="Dot" Property="Fill" Value="Transparent"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasDue}" Value="False">
+                    <Setter TargetName="Due" Property="Text" Value=""/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsComposing}" Value="True">
+                    <Setter TargetName="Row" Property="Background" Value="{DynamicResource Hover}"/>
+                    <Setter TargetName="Row" Property="Cursor" Value="Arrow"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsRunning}" Value="True">
                     <Setter TargetName="Acts" Property="Visibility" Value="Visible"/>

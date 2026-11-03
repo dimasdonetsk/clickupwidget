@@ -14,7 +14,7 @@ namespace ClickUpWidget
         public static AppController? Current { get; private set; }
 
         public Settings Settings { get; private set; } = new();
-        public IReadOnlyList<(string Id, string Name)> Teams => _teams;
+        public IReadOnlyList<(string Id, string Name)> Teams => _teams.Select(t => (t.Id, t.Name)).ToList();
         public string UserName { get; private set; } = "";
 
         private readonly DashboardViewModel _vm = new();
@@ -26,7 +26,7 @@ namespace ClickUpWidget
 
         private ClickUpClient? _client;
         private long _userId;
-        private List<(string Id, string Name)> _teams = new();
+        private List<(string Id, string Name, List<Person> Members)> _teams = new();
 
         private List<TaskItem> _tasks = new();          // те, що показуємо (без беклогу, скасованих, done)
         private List<TaskItem> _allTasks = new();       // усе незакрите на мене — для інбоксу
@@ -48,7 +48,14 @@ namespace ClickUpWidget
         private readonly DispatcherTimer _refreshTimer = new();
         private readonly DispatcherTimer _pollTimer = new() { Interval = TimeSpan.FromSeconds(45) };
         private readonly DispatcherTimer _tickTimer = new() { Interval = TimeSpan.FromSeconds(1) };
-        private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromHours(6) };
+        // Оновлення: двічі на день, тихо (без вікон), з перезапуском.
+        private readonly DispatcherTimer _updateTimer = new() { Interval = TimeSpan.FromHours(12) };
+        private readonly DispatcherTimer _applyRetry = new() { Interval = TimeSpan.FromMinutes(10) };
+
+        // Поле коментаря: відкрите лише одне; поки людина пише, списки не перебудовуються.
+        private IComposerHost? _composerHost;
+        private bool _rowsDirty, _inboxDirty;
+        private readonly Dictionary<string, (DateTime At, List<Person> People)> _taskPeople = new();
         private UpdateInfo? _pendingUpdate;
         private bool _checkingUpdates;
         /// <summary>До цього моменту нижній рядок не перетирається звичайним «Оновлено о…».</summary>
@@ -70,7 +77,7 @@ namespace ClickUpWidget
             _vm.ShowMenu = new RelayCommand(ShowMenuAtCursor);
             _vm.OpenClickUp = new RelayCommand(OpenClickUp);
             _vm.AddToken = new RelayCommand(ShowTokenWindow);
-            _vm.ApplyUpdate = new RelayCommand(ApplyUpdate);
+            _vm.ApplyUpdate = new RelayCommand(() => ApplyUpdate(silent: false));
 
             _inbox = Inbox.Load();
             _ivm.Open = new RelayCommand(p => { if (p is InboxRow r) OpenUrl(r.Event.Url); });
@@ -87,6 +94,7 @@ namespace ClickUpWidget
             _pollTimer.Tick += (_, _) => _ = PollTimerAsync();
             _tickTimer.Tick += (_, _) => Tick();
             _updateTimer.Tick += (_, _) => _ = CheckUpdatesAsync(false);
+            _applyRetry.Tick += (_, _) => TryApplySilently();
             _tickTimer.Start();
 
             string? token = Settings.Token;
@@ -114,7 +122,7 @@ namespace ClickUpWidget
             try
             {
                 (long id, string name) = await client.GetUserAsync();
-                List<(string, string)> teams = await client.GetTeamsAsync();
+                List<(string Id, string Name, List<Person> Members)> teams = await client.GetTeamsAsync();
                 if (teams.Count == 0) { client.Dispose(); return "У цьому акаунті немає жодного робочого простору."; }
 
                 _client?.Dispose();
@@ -122,8 +130,8 @@ namespace ClickUpWidget
                 _userId = id;
                 UserName = name;
                 _teams = teams;
-                if (Settings.TeamId == null || teams.All(t => t.Item1 != Settings.TeamId))
-                    Settings.TeamId = teams[0].Item1;
+                if (Settings.TeamId == null || teams.All(t => t.Id != Settings.TeamId))
+                    Settings.TeamId = teams[0].Id;
                 if (saveToken) Settings.Token = token;
                 Settings.Save();
 
@@ -237,25 +245,35 @@ namespace ClickUpWidget
         {
             DateTime now = DateTime.Now;
 
-            _vm.DueRows.Clear();
-            foreach (TaskItem t in _tasks.Where(t => TaskText.IsDueNow(t.Due, now)).OrderBy(t => t.Due))
-                _vm.DueRows.Add(new TaskRow(t, now) { IsRunning = t.Id == _running?.TaskId });
-            _vm.DueCount = _vm.DueRows.Count;
-
-            _vm.Groups.Clear();
-            foreach ((string status, string? color, List<TaskItem> list) in TaskText.Group(_tasks))
+            if (_composerHost != null)
             {
-                var g = new StatusGroup
-                {
-                    Name = TaskText.StatusLabel(status),
-                    Brush = Theme.StatusBrush(color),
-                    Hollow = string.Equals(list[0].StatusType, "open", StringComparison.OrdinalIgnoreCase),
-                };
-                foreach (TaskItem t in list)
-                    g.Rows.Add(new TaskRow(t, now) { IsRunning = t.Id == _running?.TaskId });
-                _vm.Groups.Add(g);
+                // Людина пише коментар — рядки не перебудовуємо (інакше поле зникне), лише позначки таймера.
+                _rowsDirty = true;
+                foreach (TaskRow row in _vm.DueRows.Concat(_vm.Groups.SelectMany(g => g.Rows)))
+                    row.IsRunning = row.Task.Id == _running?.TaskId;
             }
-            _vm.OpenCount = _tasks.Count;
+            else
+            {
+                _rowsDirty = false;
+                _vm.DueRows.Clear();
+                foreach (TaskItem t in _tasks.Where(t => TaskText.IsDueNow(t.Due, now)).OrderBy(t => t.Due))
+                    _vm.DueRows.Add(MakeRow(t, now));
+                _vm.DueCount = _vm.DueRows.Count;
+
+                _vm.Groups.Clear();
+                foreach ((string status, string? color, List<TaskItem> list) in TaskText.Group(_tasks))
+                {
+                    var g = new StatusGroup
+                    {
+                        Name = TaskText.StatusLabel(status),
+                        Brush = Theme.StatusBrush(color),
+                        Hollow = string.Equals(list[0].StatusType, "open", StringComparison.OrdinalIgnoreCase),
+                    };
+                    foreach (TaskItem t in list) g.Rows.Add(MakeRow(t, now));
+                    _vm.Groups.Add(g);
+                }
+                _vm.OpenCount = _tasks.Count;
+            }
 
             if (_running != null)
             {
@@ -270,6 +288,14 @@ namespace ClickUpWidget
             _vm.HasTimer = _running != null;
             Tick();
         }
+
+        private TaskRow MakeRow(TaskItem t, DateTime now) => new(t, now)
+        {
+            IsRunning = t.Id == _running?.TaskId,
+            ShowChip = Settings.RowShowProject,
+            ShowDue = Settings.RowShowDue,
+            ShowPriority = Settings.RowShowPriority,
+        };
 
         /// <summary>Щосекунди: годинник таймера і час за сьогодні.</summary>
         private void Tick()
@@ -443,7 +469,20 @@ namespace ClickUpWidget
                 if (_inbox.TeamId != Settings.TeamId) _inbox = new InboxState { TeamId = Settings.TeamId };
 
                 long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                (List<InboxEvent> events, List<TaskItem> check) = Inbox.Diff(_inbox, _allTasks, now, _selfStatus);
+                InboxDiff diff = Inbox.Diff(_inbox, _allTasks, now, _selfStatus, _userId);
+                List<InboxEvent> events = diff.Events;
+                List<TaskItem> check = diff.CheckComments;
+
+                // Задачі, що зникли з мого списку: дізнаємося, закрили їх, прибрали мене чи видалили.
+                foreach (string id in diff.Gone.Take(10))
+                {
+                    try
+                    {
+                        TaskItem? fetched = await _client.GetTaskAsync(id);
+                        if (Inbox.ResolveGone(_inbox, id, fetched, _userId, now, _selfStatus) is InboxEvent gone) events.Add(gone);
+                    }
+                    catch (Exception ex) { Log.Write("Gone " + id + ": " + ex.GetBaseException().Message); }
+                }
 
                 // Коментарі тягнемо лише для задач, які змінювались; за раз не більше 15, решта — наступного разу.
                 foreach (TaskItem t in check.Take(15))
@@ -465,10 +504,15 @@ namespace ClickUpWidget
 
         private void RenderInbox()
         {
+            if (_composerHost is InboxRow)
+            {
+                _inboxDirty = true;   // у віконці оновлень пишуть коментар — не перебудовуємо
+                return;
+            }
+            _inboxDirty = false;
             DateTime now = DateTime.Now;
             List<InboxEvent> shown = _inbox.Events.Where(e =>
-                    (e.Kind == "comment" ? Settings.InboxComments : Settings.InboxStatuses)
-                    && !Settings.HiddenProjects.Contains(e.Project))
+                    Settings.InboxShows(e) && !Settings.HiddenProjects.Contains(e.Project))
                 .ToList();
             _ivm.Rows.Clear();
             foreach (InboxEvent e in shown)
@@ -484,6 +528,77 @@ namespace ClickUpWidget
             Inbox.Save(_inbox);
             foreach (InboxRow row in _ivm.Rows) row.IsUnread = false;
             _ivm.Unread = 0;
+        }
+
+        // ───────────────────────────── коментарі ─────────────────────────────
+
+        /// <summary>Відкрити поле коментаря під рядком (або закрити, якщо вже відкрите там).</summary>
+        public void ToggleComposer(IComposerHost host, bool replyToAuthor = false)
+        {
+            bool same = ReferenceEquals(_composerHost, host);
+            CloseComposer();
+            if (same) return;
+
+            Person? reply = null;
+            if (replyToAuthor && host is InboxRow ir && ir.Event.WhoId > 0 && ir.Event.WhoId != _userId)
+            {
+                string name = ir.Event.Who;
+                reply = AllPeople().FirstOrDefault(p => p.Id == ir.Event.WhoId)
+                        ?? new Person(ir.Event.WhoId, name, "", null, name.Length > 0 ? name.Substring(0, 1).ToUpperInvariant() : "?");
+            }
+            _composerHost = host;
+            host.Composer = new ComposerModel { TaskId = host.TaskId, TaskTitle = host.TaskTitle, ReplyTo = reply };
+        }
+
+        public void CloseComposer()
+        {
+            if (_composerHost == null) return;
+            _composerHost.Composer = null;
+            _composerHost = null;
+            if (_rowsDirty) Render();
+            if (_inboxDirty) RenderInbox();
+        }
+
+        private List<Person> AllPeople() =>
+            _teams.FirstOrDefault(t => t.Id == Settings.TeamId).Members ?? new List<Person>();
+
+        /// <summary>Люди для @: учасники задачі (кеш 10 хв), усі в робочому просторі, мій id.</summary>
+        public async Task<(List<Person> Task, List<Person> All, long Me)> GetMentionPeopleAsync(string taskId)
+        {
+            List<Person> all = AllPeople();
+            if (_client == null) return (new List<Person>(), all, _userId);
+            if (!_taskPeople.TryGetValue(taskId, out var cached) || DateTime.Now - cached.At > TimeSpan.FromMinutes(10))
+            {
+                try { cached = (DateTime.Now, await _client.GetTaskMembersAsync(taskId)); }
+                catch (Exception ex)
+                {
+                    Log.Write("Task members: " + ex.GetBaseException().Message);
+                    cached = (DateTime.Now, new List<Person>());
+                }
+                _taskPeople[taskId] = cached;
+            }
+            return (cached.People, all, _userId);
+        }
+
+        /// <summary>Надіслати коментар. Повертає текст помилки або null.</summary>
+        public async Task<string?> SendCommentAsync(ComposerModel model)
+        {
+            if (_client == null) return "Немає підключення до ClickUp";
+            string text = model.Text.Trim();
+            if (text.Length == 0) return null;
+            try
+            {
+                await _client.PostCommentAsync(model.TaskId, CommentText.Build(text, model.Mentions));
+                Log.Write("Comment sent to " + model.TaskId);
+                CloseComposer();
+                SetState("Коментар надіслано", 10);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log.Write("Comment: " + ex.GetBaseException().Message);
+                return "Не вдалося надіслати. Спробуй ще раз.";
+            }
         }
 
         private void ShowInbox()
@@ -546,6 +661,7 @@ namespace ClickUpWidget
 
         public void SetTeam(string teamId)
         {
+            CloseComposer();
             Change(s => s.TeamId = teamId);
             _statusCache.Clear();
             _running = null;
@@ -591,13 +707,17 @@ namespace ClickUpWidget
             _stateStickyUntil = DateTime.Now.AddSeconds(stickySeconds);
         }
 
-        /// <summary>«Перевірити оновлення» з меню: людина чекає відповіді, тож показуємо кожен крок і одразу ставимо.</summary>
+        /// <summary>«Перевірити оновлення» з меню: показуємо кожен крок і одразу ставимо.</summary>
         public void CheckUpdatesManual()
         {
-            if (_pendingUpdate != null) { ApplyUpdate(); return; }
+            if (_pendingUpdate != null) { ApplyUpdate(silent: false); return; }
             _ = CheckUpdatesAsync(true);
         }
 
+        /// <summary>
+        /// Перевірка оновлень. Фонова (двічі на день) — повністю тиха: знайшли → завантажили →
+        /// встановили без вікон і перезапустилися. Якщо людина саме пише коментар — відкладаємо.
+        /// </summary>
         private async Task CheckUpdatesAsync(bool manual)
         {
             if (_checkingUpdates)
@@ -633,10 +753,10 @@ namespace ClickUpWidget
                 if (manual)
                 {
                     SetState("Встановлюю " + version + "…", 60);
-                    ApplyUpdate();   // людина сама попросила — ставимо одразу, програма перезапуститься
+                    ApplyUpdate(silent: false);
                 }
                 else
-                    _vm.UpdateText = "Оновити до " + version + " ↻";   // тихо: лише рядок унизу панелі
+                    TryApplySilently();
             }
             catch (Exception ex)
             {
@@ -649,18 +769,43 @@ namespace ClickUpWidget
             }
         }
 
-        private void ApplyUpdate()
+        /// <summary>Тихо встановити завантажене оновлення, якщо людина зараз нічим не зайнята у віджеті.</summary>
+        private void TryApplySilently()
+        {
+            if (_pendingUpdate == null) return;
+            bool busy = _composerHost != null || _flyout != null || _tokenWindow != null;
+            if (busy)
+            {
+                Log.Write("Update: postponed (user is busy)");
+                _applyRetry.Start();   // спробуємо через 10 хв
+                return;
+            }
+            _applyRetry.Stop();
+            ApplyUpdate(silent: true);
+        }
+
+        private void ApplyUpdate(bool silent)
         {
             if (_pendingUpdate == null) return;
             try
             {
                 Inbox.Save(_inbox);
-                Updater.ApplyAndRestart(_pendingUpdate);
+                Settings.Save();
+                Log.Write("Update: applying " + Updater.VersionOf(_pendingUpdate) + (silent ? " silently" : ""));
+                if (silent)
+                {
+                    // Оновлювач чекає, поки програма закриється, ставить нову версію без вікон і запускає її знову.
+                    Updater.ApplySilentlyOnExit(_pendingUpdate);
+                    Application.Current.Shutdown();
+                }
+                else
+                    Updater.ApplyAndRestart(_pendingUpdate);
             }
             catch (Exception ex)
             {
                 Log.Write("Apply update: " + ex);
-                SetState("Не вдалося встановити оновлення", 60);
+                _vm.UpdateText = "Оновити до " + Updater.VersionOf(_pendingUpdate) + " ↻";
+                if (!silent) SetState("Не вдалося встановити оновлення", 60);
             }
         }
 
@@ -672,6 +817,7 @@ namespace ClickUpWidget
             _pollTimer.Stop();
             _tickTimer.Stop();
             _updateTimer.Stop();
+            _applyRetry.Stop();
             _tray?.Dispose();
             _client?.Dispose();
             Inbox.Save(_inbox);

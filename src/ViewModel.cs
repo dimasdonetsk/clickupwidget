@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -32,18 +33,62 @@ namespace ClickUpWidget
         public void Execute(object? parameter) => _run(parameter);
     }
 
-    /// <summary>Рядок задачі.</summary>
-    public sealed class TaskRow : Observable
+    /// <summary>Рядок, під яким можна відкрити поле коментаря (задача на панелі або подія в інбоксі).</summary>
+    public interface IComposerHost
     {
+        string TaskId { get; }
+        string TaskTitle { get; }
+        ComposerModel? Composer { get; set; }
+    }
+
+    /// <summary>Поле коментаря під рядком. Текст живе тут, щоб не губитися при перемальовуванні.</summary>
+    public sealed class ComposerModel : Observable
+    {
+        public string TaskId { get; init; } = "";
+        public string TaskTitle { get; init; } = "";
+        /// <summary>Для відповіді в інбоксі: на чий коментар відповідаємо (одразу підставляється @ім'я).</summary>
+        public Person? ReplyTo { get; init; }
+
+        private string _text = "";
+        public string Text { get => _text; set => Set(ref _text, value); }
+
+        private bool _busy;
+        public bool Busy { get => _busy; set => Set(ref _busy, value); }
+
+        private string _error = "";
+        public string Error { get => _error; set { if (Set(ref _error, value)) Raise(nameof(HasError)); } }
+        public bool HasError => Error.Length > 0;
+
+        /// <summary>Кого згадали через список @ (ім'я в тексті → людина).</summary>
+        public List<Person> Mentions { get; } = new();
+    }
+
+    /// <summary>Рядок задачі.</summary>
+    public sealed class TaskRow : Observable, IComposerHost
+    {
+        public string TaskId => Task.Id;
+        public string TaskTitle => Task.Title;
+
+        private ComposerModel? _composer;
+        public ComposerModel? Composer { get => _composer; set { if (Set(ref _composer, value)) Raise(nameof(IsComposing)); } }
+        public bool IsComposing => Composer != null;
+
+        public bool ShowChip { get; init; } = true;
+        public bool ShowDue { get; init; } = true;
+        public bool ShowPriority { get; init; }
+        public bool HasPriority => ShowPriority && !string.IsNullOrEmpty(Task.Priority);
+        public Brush PriorityBrush => Theme.StatusBrush(Task.PriorityColor);
+        public string PriorityText => TaskText.PriorityLabel(Task.Priority);
+
         public TaskItem Task { get; }
         public string Project => Task.Project;
-        public bool HasProject => Task.Project.Length > 0;
+        public bool HasProject => ShowChip && Task.Project.Length > 0;
         public Brush ChipBack { get; }
         public Brush ChipFore { get; }
         public string Title => Task.Title;
         public string Tooltip => Task.RawName;
         public string DueText { get; }
-        public bool HasDue => DueText.Length > 0;
+        public bool HasDue => ShowDue && DueText.Length > 0;
         public Brush StatusBrush { get; }
         /// <summary>Статус-тип «open» (не почато) — кружечок без заливки.</summary>
         public bool Hollow { get; }
@@ -129,23 +174,37 @@ namespace ClickUpWidget
         public ICommand ApplyUpdate { get; set; } = new RelayCommand(() => { });
     }
 
-    /// <summary>Рядок інбоксу.</summary>
-    public sealed class InboxRow : Observable
+    /// <summary>Рядок інбоксу: заголовок за типом події, текст і/або «було → стало».</summary>
+    public sealed class InboxRow : Observable, IComposerHost
     {
         public InboxEvent Event { get; }
-        public bool IsComment => Event.Kind == "comment";
-        public bool IsStatus => !IsComment;
+        public string TaskId => Event.TaskId;
+        public string TaskTitle => Event.Title;
+
+        private ComposerModel? _composer;
+        public ComposerModel? Composer { get => _composer; set { if (Set(ref _composer, value)) Raise(nameof(IsComposing)); } }
+        public bool IsComposing => Composer != null;
+
         public string Project => Event.Project;
         public bool HasProject => Event.Project.Length > 0;
         public Brush ChipBack { get; }
         public Brush ChipFore { get; }
         public string Title => Event.Title;
-        public string Who => IsComment ? (Event.Who.Length > 0 ? Event.Who : "Коментар") : "Статус";
+        public string Header { get; }
         public string Text => Event.Text;
-        public string FromLabel => TaskText.StatusLabel(Event.From);
-        public string ToLabel => TaskText.StatusLabel(Event.To);
+        public bool HasText => Event.Text.Length > 0;
+
+        /// <summary>Рядок «було → стало» (статус, дедлайн, пріоритет, закриття).</summary>
+        public bool ShowChange { get; }
+        /// <summary>Кольорові кружечки біля «було/стало» (для статусів і пріоритету).</summary>
+        public bool ShowDots { get; }
+        public bool HasFrom => FromLabel.Length > 0;
+        public string FromLabel { get; }
+        public string ToLabel { get; }
         public Brush FromBrush { get; }
         public Brush ToBrush { get; }
+        /// <summary>На коментар можна відповісти з @ім'ям автора.</summary>
+        public bool CanReply => Event.Kind is Inbox.KindComment or Inbox.KindMention && !Event.Mine;
 
         private string _timeText = "";
         public string TimeText { get => _timeText; set => Set(ref _timeText, value); }
@@ -159,6 +218,23 @@ namespace ClickUpWidget
             (ChipBack, ChipFore) = Theme.Chip(e.Project);
             FromBrush = Theme.StatusBrush(e.FromColor);
             ToBrush = Theme.StatusBrush(e.ToColor);
+            string who = e.Who.Length > 0 ? e.Who : "Хтось";
+
+            (Header, ShowChange, ShowDots, FromLabel, ToLabel) = e.Kind switch
+            {
+                Inbox.KindComment => (e.Mine ? "Ти написав" : who, false, false, "", ""),
+                Inbox.KindMention => (who + " згадав(-ла) тебе", false, false, "", ""),
+                Inbox.KindStatus => ("Статус", true, true, TaskText.StatusLabel(e.From), TaskText.StatusLabel(e.To)),
+                Inbox.KindClosed => ("Задачу закрито", true, true, "", TaskText.StatusLabel(e.To)),
+                Inbox.KindDeleted => ("Задачу видалено", false, false, "", ""),
+                Inbox.KindAssigned => ("Нова задача на тебе", false, false, "", ""),
+                Inbox.KindUnassigned => ("Тебе прибрали з задачі", false, false, "", ""),
+                Inbox.KindDue => ("Дедлайн", true, false, e.From, e.To),
+                Inbox.KindPriority => ("Пріоритет", true, true, e.From, e.To),
+                Inbox.KindRenamed => ("Перейменовано", false, false, "", ""),
+                Inbox.KindAssignees => ("Виконавці", false, false, "", ""),
+                _ => (e.Kind, false, false, "", ""),
+            };
         }
     }
 
