@@ -172,6 +172,18 @@ namespace ClickUpWidget
             _ => StatusLabel(priority!),
         };
 
+        /// <summary>
+        /// Спокійний колір прапорця пріоритету. Кольори ClickUp не беремо: «Терміновий» там яскраво-червоний.
+        /// null — сірий (низький або без пріоритету).
+        /// </summary>
+        public static string? PriorityColor(string? priority) => (priority ?? "").ToLowerInvariant() switch
+        {
+            "urgent" => "#E0A15A",   // приглушений помаранчевий
+            "high" => "#D6C46E",     // приглушений жовтий
+            "normal" => "#7AA7FF",   // як крапка нового в інбоксі
+            _ => null,
+        };
+
         public static string StatusLabel(string status) =>
             status.Length == 0 ? status : char.ToUpper(status[0], Uk) + status.Substring(1);
     }

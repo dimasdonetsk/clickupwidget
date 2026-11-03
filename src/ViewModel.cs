@@ -77,7 +77,7 @@ namespace ClickUpWidget
         public bool ShowDue { get; init; } = true;
         public bool ShowPriority { get; init; }
         public bool HasPriority => ShowPriority && !string.IsNullOrEmpty(Task.Priority);
-        public Brush PriorityBrush => Theme.StatusBrush(Task.PriorityColor);
+        public Brush PriorityBrush => Theme.StatusBrush(TaskText.PriorityColor(Task.Priority));
         public string PriorityText => TaskText.PriorityLabel(Task.Priority);
 
         public TaskItem Task { get; }

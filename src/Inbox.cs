@@ -176,8 +176,8 @@ namespace ClickUpWidget
                     if (!string.Equals(seen.Priority ?? "", t.Priority ?? "", StringComparison.OrdinalIgnoreCase))
                     {
                         InboxEvent e = New(KindPriority, t, at, t.Priority ?? "none");
-                        e.From = TaskText.PriorityLabel(seen.Priority); e.FromColor = seen.PriorityColor;
-                        e.To = TaskText.PriorityLabel(t.Priority); e.ToColor = t.PriorityColor;
+                        e.From = TaskText.PriorityLabel(seen.Priority); e.FromColor = TaskText.PriorityColor(seen.Priority);
+                        e.To = TaskText.PriorityLabel(t.Priority); e.ToColor = TaskText.PriorityColor(t.Priority);
                         diff.Events.Add(e);
                     }
 

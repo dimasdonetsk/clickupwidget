@@ -481,6 +481,13 @@ namespace ClickUpWidget
                         TaskItem? fetched = await _client.GetTaskAsync(id);
                         if (Inbox.ResolveGone(_inbox, id, fetched, _userId, now, _selfStatus) is InboxEvent gone) events.Add(gone);
                     }
+                    catch (ClickUpException ex) when (ex.Status is 401 or 403)
+                    {
+                        // Доступу до задачі більше немає (наприклад, забрали зі списку) — тихо забуваємо,
+                        // інакше вона перепитувалась би щоразу й затуляла інші зниклі задачі.
+                        _inbox.Tasks.Remove(id);
+                        Log.Write("Gone " + id + ": no access, forgotten");
+                    }
                     catch (Exception ex) { Log.Write("Gone " + id + ": " + ex.GetBaseException().Message); }
                 }
 

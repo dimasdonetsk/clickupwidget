@@ -27,8 +27,10 @@
                         VerticalAlignment="Bottom" ToolTip="Надіслати (Enter)" Content="&#xE724;" Click="Send_Click"/>
             </Grid>
             <Grid Margin="2,5,0,0">
-                <TextBlock x:Name="Note" FontSize="10.5" Foreground="{DynamicResource Fg3}"
-                           Text="Enter — надіслати · Shift+Enter — новий рядок · Esc — скасувати"/>
+                <!-- Коротко, щоб влазило в панель; Shift+Enter — у підказці -->
+                <TextBlock x:Name="Note" FontSize="10.5" Foreground="{DynamicResource Fg3}" TextTrimming="CharacterEllipsis"
+                           Text="Enter — надіслати · Esc — скасувати"
+                           ToolTip="Enter — надіслати · Shift+Enter — новий рядок · Esc — скасувати"/>
                 <TextBlock Text="{Binding Error}" FontSize="11" Foreground="#FF8A80" TextWrapping="Wrap" Background="{DynamicResource CardSolid}"
                            Visibility="{Binding HasError, Converter={StaticResource Vis}}"/>
             </Grid>

@@ -13,7 +13,13 @@ namespace ClickUpWidget
     public sealed class ClickUpException : Exception
     {
         public bool Unauthorized { get; }
-        public ClickUpException(string message, bool unauthorized = false) : base(message) { Unauthorized = unauthorized; }
+        /// <summary>HTTP-код відповіді (0 — невідомо).</summary>
+        public int Status { get; }
+        public ClickUpException(string message, bool unauthorized = false, int status = 0) : base(message)
+        {
+            Unauthorized = unauthorized;
+            Status = status;
+        }
     }
 
     /// <summary>Мінімальний клієнт ClickUp API v2 — лише те, що потрібно віджету.</summary>
@@ -289,7 +295,7 @@ namespace ClickUpWidget
             try { text = await res.Content.ReadAsStringAsync(); } catch { }
             if (text.Length > 300) text = text.Substring(0, 300);
             bool auth = res.StatusCode == HttpStatusCode.Unauthorized;
-            throw new ClickUpException("ClickUp " + (int)res.StatusCode + ": " + text, auth);
+            throw new ClickUpException("ClickUp " + (int)res.StatusCode + ": " + text, auth, (int)res.StatusCode);
         }
 
         private static string? Str(JsonElement e, string name)

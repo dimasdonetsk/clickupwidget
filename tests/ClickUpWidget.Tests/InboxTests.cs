@@ -98,6 +98,7 @@ namespace ClickUpWidget.Tests
             Assert.Equal("7 лис", due.To);
             Assert.Equal("Звичайний", diff.Events[1].From);
             Assert.Equal("Терміновий", diff.Events[1].To);
+            Assert.Equal(TaskText.PriorityColor("urgent"), diff.Events[1].ToColor);   // спокійний колір, не #f50000 з ClickUp
             Assert.Equal("Було: Банер — верстка", diff.Events[2].Text);
             Assert.Equal("+ Петро · − Олена", diff.Events[3].Text);
 

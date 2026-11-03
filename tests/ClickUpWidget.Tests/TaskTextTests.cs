@@ -161,5 +161,27 @@ namespace ClickUpWidget.Tests
             Assert.False(TaskText.IsVisible(new TaskItem { Project = "", Status = "to do", StatusType = "open" }, vis, hidden));
             Assert.True(TaskText.IsVisible(new TaskItem { Project = "АП", Status = "to do", StatusType = "open" }, vis, hidden));
         }
+
+        // Без червоних акцентів: замість яскравих кольорів ClickUp (#f50000 у «Терміновий») — спокійні.
+        [Theory]
+        [InlineData("urgent")]
+        [InlineData("URGENT")]
+        [InlineData("high")]
+        [InlineData("normal")]
+        public void PriorityColorsAreCalm(string priority)
+        {
+            string? hex = TaskText.PriorityColor(priority);
+            Assert.NotNull(hex);
+            var c = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+            // «Червоний» — коли червоний канал сильно переважає і зелений, і синій.
+            Assert.False(c.R > 180 && c.G < 120 && c.B < 120, priority + " виглядає червоним: " + hex);
+        }
+
+        [Fact]
+        public void LowOrNoPriorityIsGrey()
+        {
+            Assert.Null(TaskText.PriorityColor("low"));
+            Assert.Null(TaskText.PriorityColor(null));
+        }
     }
 }

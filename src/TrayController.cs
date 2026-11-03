@@ -53,7 +53,7 @@ namespace ClickUpWidget
             _icon.Text = tooltip.Length > 120 ? tooltip.Substring(0, 120) : tooltip;
             if (_iconRunning != timerRunning)
             {
-                Icon old = _icon.Icon;
+                Icon? old = _icon.Icon;
                 _icon.Icon = MakeIcon(timerRunning);
                 old?.Dispose();
                 _iconRunning = timerRunning;
