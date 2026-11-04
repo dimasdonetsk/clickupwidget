@@ -172,9 +172,14 @@ namespace ClickUpWidget.Tests
         {
             string? hex = TaskText.PriorityColor(priority);
             Assert.NotNull(hex);
-            var c = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+            // #RRGGBB або #AARRGGBB — беремо останні шість цифр.
+            string rgb = hex!.TrimStart('#');
+            rgb = rgb.Substring(rgb.Length - 6);
+            int r = System.Convert.ToInt32(rgb.Substring(0, 2), 16);
+            int g = System.Convert.ToInt32(rgb.Substring(2, 2), 16);
+            int b = System.Convert.ToInt32(rgb.Substring(4, 2), 16);
             // «Червоний» — коли червоний канал сильно переважає і зелений, і синій.
-            Assert.False(c.R > 180 && c.G < 120 && c.B < 120, priority + " виглядає червоним: " + hex);
+            Assert.False(r > 180 && g < 120 && b < 120, priority + " виглядає червоним: " + hex);
         }
 
         // Задача з таймером показується один раз — зверху, а не ще й у списках.

@@ -50,21 +50,4 @@ namespace ClickUpWidget
             e.Handled = true;
         }
     }
-
-    internal static class Log
-    {
-        public static void Write(string text)
-        {
-            try
-            {
-                Directory.CreateDirectory(Settings.DataDir);
-                string path = Path.Combine(Settings.DataDir, "log.txt");
-                // Журнал не росте безкінечно: понад 256 КБ починаємо заново.
-                var info = new FileInfo(path);
-                if (info.Exists && info.Length > 256 * 1024) info.Delete();
-                File.AppendAllText(path, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  " + text + Environment.NewLine);
-            }
-            catch { }
-        }
-    }
 }

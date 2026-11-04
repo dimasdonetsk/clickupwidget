@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:ClickUpWidget.Mac"
+        x:Class="ClickUpWidget.Mac.TokenWindow"
+        Title="Підключити ClickUp" Width="452" SizeToContent="Height"
+        SystemDecorations="None" Background="Transparent" TransparencyLevelHint="Transparent"
+        CanResize="False" WindowStartupLocation="CenterScreen" Topmost="True"
+        Foreground="{DynamicResource Fg}">
+    <Window.Styles>
+        <Style Selector="Button.primary">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="#0E0E11"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="B" Background="#7AA7FF" CornerRadius="9" Padding="16,8">
+                        <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ Border#B">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Button.primary:disabled /template/ Border#B">
+            <Setter Property="Opacity" Value="0.5"/>
+        </Style>
+        <Style Selector="TextBox.token">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource Fg}"/>
+            <Setter Property="FontFamily" Value="Menlo, Consolas, monospace"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style Selector="TextBox.token:pointerover /template/ Border#PART_BorderElement, TextBox.token:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBox.token:pointerover, TextBox.token:focus">
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        </Style>
+    </Window.Styles>
+
+    <Panel Margin="16,12,16,20">
+        <Border Classes="shadow" CornerRadius="16" BoxShadow="0 8 30 0 #73000000"/>
+        <Border Classes="card" CornerRadius="16" Background="{DynamicResource CardSolid}" Padding="22,20,22,20">
+            <StackPanel>
+                <Grid Background="Transparent" PointerPressed="Drag">
+                    <TextBlock Text="Підключи ClickUp" FontSize="17" FontWeight="SemiBold"/>
+                    <Button Classes="icon ghost" HorizontalAlignment="Right" VerticalAlignment="Top" Click="Close_Click" ToolTip.Tip="Закрити">
+                        <local:Glyph Data="{StaticResource IconClose}" Width="11" Height="11"/>
+                    </Button>
+                </Grid>
+                <TextBlock Name="PrivacyText" TextWrapping="Wrap" FontSize="12.5" Foreground="{DynamicResource Fg2}" Margin="0,10,0,0" LineHeight="19"
+                           Text="Віджету потрібен твій особистий API-токен. Він лишається тільки на цьому комп'ютері."/>
+                <TextBlock TextWrapping="Wrap" FontSize="12.5" Foreground="{DynamicResource Fg2}" Margin="0,10,0,0" LineHeight="19"
+                           Text="ClickUp → аватар унизу зліва → Settings → Apps → API Token → Generate / Copy."/>
+                <Button Classes="link" Margin="0,6,0,0" FontSize="12.5" Foreground="{DynamicResource Fg2}" Click="OpenTokenPage"
+                        Content="Відкрити цю сторінку в ClickUp ↗"/>
+
+                <Border Margin="0,16,0,0" CornerRadius="9" BorderThickness="1" BorderBrush="{DynamicResource Line}"
+                        Background="{DynamicResource Hover}" Padding="10,7">
+                    <TextBox Name="TokenBox" Classes="token"/>
+                </Border>
+                <TextBlock Name="ErrorText" Margin="0,8,0,0" FontSize="12" Foreground="#FF8A80" TextWrapping="Wrap" IsVisible="False"/>
+
+                <Grid Margin="0,18,0,0">
+                    <TextBlock Name="BusyText" Text="Перевіряю…" FontSize="12" Foreground="{DynamicResource Fg3}"
+                               VerticalAlignment="Center" IsVisible="False"/>
+                    <Button Name="SaveBtn" Classes="primary" HorizontalAlignment="Right" Click="Save_Click"
+                            IsDefault="True" Content="Підключити"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Panel>
+</Window>

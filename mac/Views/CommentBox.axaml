@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:ClickUpWidget.Mac"
+             x:Class="ClickUpWidget.Mac.CommentBox"
+             Foreground="{DynamicResource Fg}">
+    <UserControl.Styles>
+        <!-- Поле без рамок і підсвіток теми: лише текст і курсор -->
+        <Style Selector="TextBox.bare">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource Fg}"/>
+            <Setter Property="SelectionBrush" Value="#7AA7FF"/>
+        </Style>
+        <Style Selector="TextBox.bare:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBox.bare:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBox.bare:pointerover, TextBox.bare:focus">
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Margin="0,6,0,2" CornerRadius="10" Background="{DynamicResource Hover}" BorderThickness="1"
+            BorderBrush="{DynamicResource Line}" Padding="10,7,6,6">
+        <StackPanel>
+            <Grid ColumnDefinitions="*,Auto">
+                <!-- Підказка, поки поле порожнє -->
+                <TextBlock Name="Hint" Text="Коментар… @ — згадати когось" FontSize="12.5" Foreground="{DynamicResource Fg3}"
+                           IsHitTestVisible="False" Margin="0,1,0,0" VerticalAlignment="Top"/>
+                <TextBox Name="Box" Classes="bare" TextWrapping="Wrap" AcceptsReturn="True" MaxHeight="96"
+                         Text="{Binding Text, Mode=TwoWay}"/>
+                <Button Name="SendBtn" Grid.Column="1" Classes="icon" Margin="8,0,0,0" VerticalAlignment="Bottom"
+                        ToolTip.Tip="Надіслати (Enter)" Click="Send_Click">
+                    <local:Glyph Data="{StaticResource IconSend}"/>
+                </Button>
+            </Grid>
+            <Grid Margin="0,5,0,0">
+                <!-- Коротко, щоб влазило в панель; Shift+Enter — у підказці -->
+                <TextBlock Name="Note" FontSize="10.5" Foreground="{DynamicResource Fg3}" TextTrimming="CharacterEllipsis"
+                           Text="Enter — надіслати · Esc — скасувати"
+                           ToolTip.Tip="Enter — надіслати · Shift+Enter — новий рядок · Esc — скасувати"/>
+                <TextBlock Text="{Binding Error}" FontSize="11" Foreground="#FF8A80" TextWrapping="Wrap"
+                           Background="{DynamicResource CardSolid}" IsVisible="{Binding HasError}"/>
+            </Grid>
+
+            <!-- Список людей для @: спершу учасники задачі, потім решта простору -->
+            <Popup Name="MentionPopup" PlacementTarget="{Binding #Box}" Placement="BottomEdgeAlignedLeft"
+                   HorizontalOffset="-14" IsLightDismissEnabled="False">
+                <Border Margin="10,4,10,16" Background="{DynamicResource Menu}" BorderBrush="{DynamicResource Line}"
+                        BorderThickness="1" CornerRadius="12" Padding="5" MinWidth="230" BoxShadow="0 4 22 0 #59000000">
+                    <StackPanel Name="MentionList"/>
+                </Border>
+            </Popup>
+        </StackPanel>
+    </Border>
+</UserControl>

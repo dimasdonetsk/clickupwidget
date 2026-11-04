@@ -1,0 +1,134 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:ClickUpWidget.Mac"
+        xmlns:shared="using:ClickUpWidget.Shared"
+        x:Class="ClickUpWidget.Mac.InboxWindow"
+        Title="ClickUp Widget — оновлення" Width="352" SizeToContent="Height"
+        SystemDecorations="None" Background="Transparent" TransparencyLevelHint="Transparent"
+        CanResize="False" ShowInTaskbar="False" ShowActivated="False"
+        Foreground="{DynamicResource Fg}">
+    <Window.Resources>
+        <local:HexBrush x:Key="Brush"/>
+
+        <DataTemplate x:Key="InboxRowTemplate" DataType="shared:InboxRow">
+            <Border Classes="irow" Classes.composing="{Binding IsComposing}" Padding="8,7" CornerRadius="10"
+                    Background="Transparent" Tapped="Row_Tapped">
+                <Grid ColumnDefinitions="14,*">
+                    <!-- Тиха крапка «нове» -->
+                    <Ellipse Width="6" Height="6" Fill="#7AA7FF" VerticalAlignment="Top" HorizontalAlignment="Left"
+                             Margin="0,6,0,0" Opacity="{Binding IsUnread, Converter={x:Static local:Opacity.FromBool}}"/>
+                    <StackPanel Grid.Column="1">
+                        <!-- Заголовок і час; при наведенні час змінюють кнопки (ширина та сама, нічого не стрибає) -->
+                        <Grid Height="20">
+                            <TextBlock Text="{Binding Header}" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,64,0" VerticalAlignment="Center"/>
+                            <TextBlock Classes="time" Text="{Binding TimeText}" FontSize="11" Foreground="{DynamicResource Fg3}"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <StackPanel Classes="acts" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Classes="icon" Width="22" Height="20" Tag="{Binding}" Click="Reply_Click"
+                                        ToolTip.Tip="Відповісти" IsVisible="{Binding CanReply}">
+                                    <local:Glyph Data="{StaticResource IconReply}"/>
+                                </Button>
+                                <Button Classes="icon" Width="22" Height="20" Margin="5,0,0,0" Tag="{Binding}" Click="Comment_Click"
+                                        ToolTip.Tip="Залишити коментар у задачі">
+                                    <local:Glyph Data="{StaticResource IconComment}"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Текст: коментар до двох рядків, або опис зміни -->
+                        <TextBlock Text="{Binding Text}" FontSize="12.5" Foreground="{DynamicResource Fg2}" Margin="0,3,0,0"
+                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"
+                                   IsVisible="{Binding HasText}"/>
+
+                        <!-- Було → стало -->
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0" IsVisible="{Binding ShowChange}">
+                            <StackPanel Orientation="Horizontal" IsVisible="{Binding HasFrom}">
+                                <Ellipse Width="8" Height="8" StrokeThickness="2" VerticalAlignment="Center" Margin="0,0,6,0"
+                                         Stroke="{Binding FromColor, Converter={StaticResource Brush}}"
+                                         Fill="{Binding FromColor, Converter={StaticResource Brush}}"
+                                         IsVisible="{Binding ShowDots}"/>
+                                <TextBlock Text="{Binding FromLabel}" FontSize="12.5" Foreground="{DynamicResource Fg2}"/>
+                                <TextBlock Text="→" FontSize="12.5" Foreground="{DynamicResource Fg3}" Margin="7,0,7,0"/>
+                            </StackPanel>
+                            <Ellipse Width="8" Height="8" StrokeThickness="2" VerticalAlignment="Center" Margin="0,0,6,0"
+                                     Stroke="{Binding ToColor, Converter={StaticResource Brush}}"
+                                     Fill="{Binding ToColor, Converter={StaticResource Brush}}"
+                                     IsVisible="{Binding ShowDots}"/>
+                            <TextBlock Text="{Binding ToLabel}" FontSize="12.5"/>
+                        </StackPanel>
+
+                        <!-- Яка задача -->
+                        <Grid Margin="0,5,0,0" ColumnDefinitions="Auto,*">
+                            <Border Background="{Binding ChipBack, Converter={StaticResource Brush}}" CornerRadius="5" Padding="5,0,5,1"
+                                    Margin="0,0,7,0" VerticalAlignment="Center" IsVisible="{Binding HasProject}">
+                                <TextBlock Text="{Binding Project}" Foreground="{Binding ChipFore, Converter={StaticResource Brush}}"
+                                           FontSize="9.5" FontWeight="Bold"/>
+                            </Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="11.5" Foreground="{DynamicResource Fg3}"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <ContentControl Content="{Binding Composer}"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="Border.irow">
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.irow:pointerover, Border.irow.composing">
+            <Setter Property="Background" Value="{DynamicResource Hover}"/>
+        </Style>
+        <Style Selector="Border.irow.composing">
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+        <Style Selector="Border.irow StackPanel.acts">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.irow:pointerover StackPanel.acts">
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="IsHitTestVisible" Value="True"/>
+        </Style>
+        <Style Selector="Border.irow:pointerover TextBlock.time">
+            <Setter Property="Opacity" Value="0"/>
+        </Style>
+    </Window.Styles>
+
+    <Panel Margin="16,12,16,20">
+        <Border Classes="shadow"/>
+        <Border Classes="card" Padding="12,14,12,10">
+            <StackPanel>
+                <!-- Шапка: за неї віконце перетягується -->
+                <Grid Background="Transparent" Margin="4,0,0,8" PointerPressed="Header_Pressed">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Оновлення" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Unread}" FontSize="12" Foreground="{DynamicResource Fg3}" Margin="8,1,0,0"
+                                   IsVisible="{Binding HasUnread}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Classes="icon ghost" Command="{Binding MarkRead}" ToolTip.Tip="Позначити все прочитаним"
+                                IsVisible="{Binding HasUnread}">
+                            <local:Glyph Data="{StaticResource IconCheck}" Width="13" Height="13"/>
+                        </Button>
+                        <Button Classes="icon ghost" Command="{Binding ShowMenu}" ToolTip.Tip="Налаштування">
+                            <local:Glyph Data="{StaticResource IconMore}" Filled="True" Width="14" Height="14"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="Поки тихо. Тут з'являться нові коментарі й зміни статусів у твоїх задачах." TextWrapping="Wrap"
+                           FontSize="12.5" Foreground="{DynamicResource Fg2}" Margin="4,0,4,6" LineHeight="18"
+                           IsVisible="{Binding IsEmpty}"/>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="360">
+                    <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource InboxRowTemplate}" Margin="0,0,2,0"/>
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+    </Panel>
+</Window>

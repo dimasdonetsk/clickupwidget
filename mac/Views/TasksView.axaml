@@ -1,0 +1,246 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:ClickUpWidget.Mac"
+             xmlns:shared="using:ClickUpWidget.Shared"
+             x:Class="ClickUpWidget.Mac.TasksView"
+             Foreground="{DynamicResource Fg}">
+    <UserControl.Resources>
+        <local:HexBrush x:Key="Brush"/>
+
+        <!-- Рядок задачі. Висота рядка і ширина правої колонки фіксовані: при наведенні нічого не стрибає -->
+        <DataTemplate x:Key="RowTemplate" DataType="shared:TaskRow">
+            <Border Classes="row" Classes.running="{Binding IsRunning}" Classes.composing="{Binding IsComposing}"
+                    Padding="8,4" CornerRadius="10" Background="Transparent" Tapped="Row_Tapped">
+                <StackPanel>
+                    <Grid Height="24" ColumnDefinitions="Auto,Auto,Auto,*,Auto" Background="Transparent"
+                          ToolTip.Tip="{Binding Tooltip}" ToolTip.ShowDelay="900">
+                        <Ellipse Width="9" Height="9" StrokeThickness="2" VerticalAlignment="Center" Margin="0,0,10,0"
+                                 Stroke="{Binding StatusColor, Converter={StaticResource Brush}}"
+                                 Fill="{Binding DotFill, Converter={StaticResource Brush}}"/>
+                        <Border Grid.Column="1" Background="{Binding ChipBack, Converter={StaticResource Brush}}" CornerRadius="6"
+                                Padding="6,1,6,2" Margin="0,0,10,0" VerticalAlignment="Center" MinWidth="30"
+                                IsVisible="{Binding HasProject}">
+                            <TextBlock Text="{Binding Project}" Foreground="{Binding ChipFore, Converter={StaticResource Brush}}"
+                                       FontSize="10.5" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        </Border>
+                        <!-- Пріоритет: маленький прапорець (вмикається в «Що показувати») -->
+                        <Panel Grid.Column="2" Background="Transparent" Margin="0,0,8,0" VerticalAlignment="Center"
+                               ToolTip.Tip="{Binding PriorityText}" IsVisible="{Binding HasPriority}">
+                            <local:Glyph Data="{StaticResource IconFlag}" Filled="True" Width="11" Height="11"
+                                         Foreground="{Binding PriorityColor, Converter={StaticResource Brush}}"/>
+                        </Panel>
+                        <TextBlock Grid.Column="3" Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+                        <!-- Дедлайн і кнопки в одній клітинці: колонка завжди займає ширину більшого з них -->
+                        <TextBlock Classes="due" Grid.Column="4" Text="{Binding ShownDue}" FontSize="11.5" Margin="10,0,0,0"
+                                   Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                        <StackPanel Classes="acts" Grid.Column="4" Orientation="Horizontal" Margin="8,0,0,0"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Classes="icon" Tag="{Binding}" Click="CommentBtn_Click" ToolTip.Tip="Залишити коментар">
+                                <local:Glyph Data="{StaticResource IconComment}"/>
+                            </Button>
+                            <Button Classes="icon" Tag="{Binding}" Click="StatusBtn_Click" Margin="6,0,0,0" ToolTip.Tip="Змінити статус">
+                                <local:Glyph Data="{StaticResource IconChevron}"/>
+                            </Button>
+                            <Button Classes="icon timer" Margin="6,0,0,0" Tag="{Binding}" Click="TimerBtn_Click">
+                                <Panel>
+                                    <local:Glyph Classes="play" Data="{StaticResource IconPlay}" Filled="True" Width="9" Height="9"/>
+                                    <local:Glyph Classes="stop" Data="{StaticResource IconStop}" Filled="True" Width="9" Height="9"/>
+                                </Panel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <ContentControl Content="{Binding Composer}"/>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Border.row">
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.row:pointerover">
+            <Setter Property="Background" Value="{DynamicResource Hover}"/>
+        </Style>
+        <Style Selector="Border.row.composing">
+            <Setter Property="Background" Value="{DynamicResource Hover}"/>
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+        <!-- Кнопки замість дедлайну: при наведенні або коли йде таймер. Прозорість, а не IsVisible — щоб ширина не стрибала -->
+        <Style Selector="Border.row StackPanel.acts">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.row:pointerover StackPanel.acts, Border.row.running StackPanel.acts">
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="IsHitTestVisible" Value="True"/>
+        </Style>
+        <Style Selector="Border.row:pointerover TextBlock.due, Border.row.running TextBlock.due">
+            <Setter Property="Opacity" Value="0"/>
+        </Style>
+        <Style Selector="Border.row local|Glyph.stop">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.row.running local|Glyph.stop">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="Border.row.running local|Glyph.play">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.row Button.timer">
+            <Setter Property="ToolTip.Tip" Value="Запустити таймер"/>
+        </Style>
+        <Style Selector="Border.row.running Button.timer">
+            <Setter Property="Foreground" Value="{DynamicResource TimerFg}"/>
+            <Setter Property="ToolTip.Tip" Value="Зупинити таймер"/>
+        </Style>
+
+        <!-- Картка таймера: при наведенні на місці годинника — дії задачі -->
+        <Style Selector="Border.timercard StackPanel.tacts">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+        </Style>
+        <Style Selector="Border.timercard.clickable">
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.timercard.clickable.composing">
+            <Setter Property="Cursor" Value="Arrow"/>
+        </Style>
+        <Style Selector="Border.timercard.clickable:pointerover StackPanel.tacts">
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="IsHitTestVisible" Value="True"/>
+        </Style>
+        <Style Selector="Border.timercard.clickable:pointerover TextBlock.clock">
+            <Setter Property="Opacity" Value="0"/>
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel>
+        <!-- Шапка: за неї панель можна перетягувати -->
+        <Grid Name="Header" Background="Transparent" Margin="0,0,0,12" PointerPressed="Header_Pressed">
+            <StackPanel>
+                <TextBlock Name="HeaderTitle" Text="Мої задачі" FontSize="15" FontWeight="SemiBold"/>
+                <TextBlock Name="TodayLine" Text="{Binding TodayText}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,2,0,0"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button Classes="icon ghost" Command="{Binding Refresh}" ToolTip.Tip="Оновити">
+                    <local:Glyph Data="{StaticResource IconRefresh}" Width="13" Height="13"/>
+                </Button>
+                <Button Classes="icon ghost" Command="{Binding ShowMenu}" ToolTip.Tip="Налаштування">
+                    <local:Glyph Data="{StaticResource IconMore}" Filled="True" Width="14" Height="14"/>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Немає токена -->
+        <Border IsVisible="{Binding NeedsToken}" Background="{DynamicResource Hover}" CornerRadius="12" Padding="12,10" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock Text="Щоб бачити задачі, підключи ClickUp через особистий API-токен." TextWrapping="Wrap"
+                           FontSize="12.5" Foreground="{DynamicResource Fg2}"/>
+                <Button Classes="link" Command="{Binding AddToken}" Margin="0,8,0,0" FontSize="12.5"
+                        Foreground="{DynamicResource Fg}" Content="Підключити →"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Запущений таймер. Задача з таймером живе тут, а не в списках: клік відкриває її,
+             при наведенні на місці годинника — ті самі дії, що й у рядку. -->
+        <Border Name="TimerCard" Classes="timercard"
+                Classes.clickable="{Binding HasRunningRow}"
+                Classes.composing="{Binding RunningRow.IsComposing, FallbackValue=False}"
+                IsVisible="False" Background="{DynamicResource TimerBg}"
+                BorderBrush="{DynamicResource TimerLine}" BorderThickness="1" CornerRadius="12" Padding="12,8" Margin="0,0,0,8"
+                Tapped="TimerCard_Tapped">
+            <StackPanel>
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Background="Transparent"
+                      ToolTip.Tip="{Binding RunningRow.Tooltip, FallbackValue={x:Null}}" ToolTip.ShowDelay="900">
+                    <Ellipse Width="8" Height="8" Fill="{DynamicResource TimerFg}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Border Grid.Column="1" Background="{Binding TimerChipBack, Converter={StaticResource Brush}}" CornerRadius="6"
+                            Padding="6,1,6,2" Margin="0,0,10,0" VerticalAlignment="Center" IsVisible="{Binding HasTimerProject}">
+                        <TextBlock Text="{Binding TimerProject}" Foreground="{Binding TimerChipFore, Converter={StaticResource Brush}}"
+                                   FontSize="10.5" FontWeight="Bold"/>
+                    </Border>
+                    <TextBlock Grid.Column="2" Text="{Binding TimerTitle}" FontSize="13" TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+                    <!-- Годинник і кнопки в одній клітинці; мінімальна ширина — щоб секунди не штовхали назву -->
+                    <Grid Grid.Column="3" Margin="10,0,10,0" MinWidth="58" VerticalAlignment="Center">
+                        <TextBlock Classes="clock" Text="{Binding TimerClock}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource TimerFg}" VerticalAlignment="Center"/>
+                        <StackPanel Classes="tacts" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button Classes="icon" Tag="{Binding RunningRow}" Click="CommentBtn_Click" ToolTip.Tip="Залишити коментар">
+                                <local:Glyph Data="{StaticResource IconComment}"/>
+                            </Button>
+                            <Button Classes="icon" Tag="{Binding RunningRow}" Click="StatusBtn_Click" Margin="6,0,0,0"
+                                    ToolTip.Tip="Змінити статус" IsVisible="{Binding RunningRow.HasList, FallbackValue=False}">
+                                <local:Glyph Data="{StaticResource IconChevron}"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <Button Grid.Column="4" Classes="icon" Background="{DynamicResource TimerLine}"
+                            Foreground="{DynamicResource TimerFg}" Command="{Binding StopTimer}" ToolTip.Tip="Зупинити таймер">
+                        <local:Glyph Data="{StaticResource IconStop}" Filled="True" Width="9" Height="9"/>
+                    </Button>
+                </Grid>
+                <ContentControl Content="{Binding RunningRow.Composer, FallbackValue={x:Null}}"/>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Name="Scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="600">
+            <StackPanel Margin="0,0,2,0">
+                <!-- Картку таймера сховано в «Що показувати»: задача з таймером — першим рядком над списками -->
+                <ContentControl Name="RunningHost" Content="{Binding RunningRow}" ContentTemplate="{StaticResource RowTemplate}"
+                                IsVisible="False" Margin="0,0,0,6"/>
+
+                <!-- Сьогодні: дедлайн сьогодні або вже минув. Без кольорових акцентів. -->
+                <StackPanel Name="DueSection" IsVisible="False">
+                    <Grid Margin="4">
+                        <TextBlock Text="СЬОГОДНІ" Classes="section"/>
+                        <TextBlock Text="{Binding DueCount}" Classes="section" HorizontalAlignment="Right"/>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding DueRows}" ItemTemplate="{StaticResource RowTemplate}"/>
+                </StackPanel>
+
+                <TextBlock Name="CompactEmpty" Text="На сьогодні дедлайнів немає" FontSize="12.5" Margin="4,2,4,6"
+                           Foreground="{DynamicResource Fg2}" IsVisible="False"/>
+
+                <StackPanel Name="AllSection">
+                    <Grid Margin="4,12,4,2" IsVisible="{Binding HasTasks}">
+                        <TextBlock Text="УСІ ВІДКРИТІ" Classes="section"/>
+                        <TextBlock Text="{Binding OpenCount}" Classes="section" HorizontalAlignment="Right"/>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Groups}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="shared:StatusGroup">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="8,10,8,2">
+                                        <Ellipse Width="8" Height="8" StrokeThickness="2" VerticalAlignment="Center" Margin="0,0,7,0"
+                                                 Stroke="{Binding Color, Converter={StaticResource Brush}}"
+                                                 Fill="{Binding DotFill, Converter={StaticResource Brush}}"/>
+                                        <TextBlock Text="{Binding Name}" FontSize="11.5" Foreground="{DynamicResource Fg2}"/>
+                                        <TextBlock Text="{Binding Count}" FontSize="11.5" Foreground="{DynamicResource Fg3}" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                    <ItemsControl ItemsSource="{Binding Rows}" ItemTemplate="{StaticResource RowTemplate}"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Name="EmptyText" Text="Відкритих задач немає" FontSize="12.5" Margin="4,8,4,4"
+                               Foreground="{DynamicResource Fg2}" IsVisible="False"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Нижній рядок -->
+        <Border Name="Footer" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Margin="0,10,0,0" Padding="2,9,2,0">
+            <Grid>
+                <TextBlock Text="{Binding StateText}" FontSize="11.5" Foreground="{DynamicResource Fg3}"
+                           TextTrimming="CharacterEllipsis" Margin="0,0,120,0"/>
+                <Button Name="OpenLink" Classes="link" HorizontalAlignment="Right" Command="{Binding OpenClickUp}"
+                        Content="Відкрити ClickUp ↗"/>
+                <Button Classes="link" HorizontalAlignment="Right" Command="{Binding ApplyUpdate}"
+                        Foreground="{DynamicResource Fg}" Content="{Binding UpdateText}"
+                        IsVisible="{Binding HasUpdate}" Background="{DynamicResource CardSolid}"/>
+            </Grid>
+        </Border>
+    </StackPanel>
+</UserControl>

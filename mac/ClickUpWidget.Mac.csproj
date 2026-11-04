@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ClickUp Widget для Mac: інтерфейс на Avalonia, логіка — спільна з Windows (core/).
+       Збирається на будь-якій ОС; запускати можна й на Windows (для перевірки вигляду). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>ClickUpWidget</AssemblyName>
+    <RootNamespace>ClickUpWidget.Mac</RootNamespace>
+    <Product>ClickUp Widget</Product>
+    <Description>Спокійний дашборд задач ClickUp на робочому столі</Description>
+    <SatelliteResourceLanguages>uk;en</SatelliteResourceLanguages>
+    <!-- Версія одна на обидві програми: береться з Windows-проєкту (src/ClickUpWidget.csproj) -->
+    <Version>$([System.Text.RegularExpressions.Regex]::Match($([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)../src/ClickUpWidget.csproj')), '&lt;Version&gt;([^&lt;]+)&lt;/Version&gt;').Groups[1].Value)</Version>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <ApplicationIcon>../src/app.ico</ApplicationIcon>
+
+    <!-- Програма весь час працює у фоні: економимо пам'ять і процесор -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>false</TieredPGO>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../core/ClickUpWidget.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+    <RuntimeHostConfigurationOption Include="System.GC.RetainVM" Value="false" />
+  </ItemGroup>
+
+</Project>

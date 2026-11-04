@@ -1,0 +1,160 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:ClickUpWidget.Mac"
+             xmlns:shared="using:ClickUpWidget.Shared"
+             x:Class="ClickUpWidget.Mac.App"
+             RequestedThemeVariant="Dark"
+             Name="ClickUp Widget">
+    <Application.Resources>
+        <!-- Кольори теми. Значення підміняє App.ApplyTheme() (з Palette у core) під час запуску і при перемиканні теми. -->
+        <SolidColorBrush x:Key="Card" Color="#E6121218"/>
+        <SolidColorBrush x:Key="CardSolid" Color="#121218"/>
+        <SolidColorBrush x:Key="Line" Color="#14FFFFFF"/>
+        <SolidColorBrush x:Key="Fg" Color="#ECEBF2"/>
+        <SolidColorBrush x:Key="Fg2" Color="#9B99A8"/>
+        <SolidColorBrush x:Key="Fg3" Color="#6E6C79"/>
+        <SolidColorBrush x:Key="Hover" Color="#0DFFFFFF"/>
+        <SolidColorBrush x:Key="Btn" Color="#14FFFFFF"/>
+        <SolidColorBrush x:Key="Menu" Color="#1C1B24"/>
+        <SolidColorBrush x:Key="TimerBg" Color="#176FD39A"/>
+        <SolidColorBrush x:Key="TimerLine" Color="#386FD39A"/>
+        <SolidColorBrush x:Key="TimerFg" Color="#6FD39A"/>
+
+        <local:HexBrush x:Key="Brush"/>
+
+        <!-- Іконки в квадраті 16×16 (див. Glyph) -->
+        <StreamGeometry x:Key="IconComment">M3,3.5 H13 A1.5,1.5 0 0 1 14.5,5 V10 A1.5,1.5 0 0 1 13,11.5 H7.5 L4.5,14 V11.5 H3 A1.5,1.5 0 0 1 1.5,10 V5 A1.5,1.5 0 0 1 3,3.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconChevron">M4,6 L8,10 L12,6</StreamGeometry>
+        <StreamGeometry x:Key="IconPlay">M5,2.8 L13,8 L5,13.2 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconStop">M4.5,4 H11.5 A0.5,0.5 0 0 1 12,4.5 V11.5 A0.5,0.5 0 0 1 11.5,12 H4.5 A0.5,0.5 0 0 1 4,11.5 V4.5 A0.5,0.5 0 0 1 4.5,4 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconRefresh">M13.2,8 A5.2,5.2 0 1 1 11.7,4.3 M12.2,1.6 V4.6 H9.2</StreamGeometry>
+        <StreamGeometry x:Key="IconMore">M2,8 A1.4,1.4 0 1 1 4.8,8 A1.4,1.4 0 1 1 2,8 Z M6.6,8 A1.4,1.4 0 1 1 9.4,8 A1.4,1.4 0 1 1 6.6,8 Z M11.2,8 A1.4,1.4 0 1 1 14,8 A1.4,1.4 0 1 1 11.2,8 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconFlag">M3.5,1.5 H5 V15 H3.5 Z M5,2.5 H13 L11,5.5 L13,8.5 H5 Z</StreamGeometry>
+        <StreamGeometry x:Key="IconCheck">M3,8.5 L6.5,12 L13,4.5</StreamGeometry>
+        <StreamGeometry x:Key="IconSend">M2,8 L14,2.5 L11,14 L8.2,9.2 Z M8.2,9.2 L14,2.5</StreamGeometry>
+        <StreamGeometry x:Key="IconReply">M6,3.5 L2,7.5 L6,11.5 M2,7.5 H9.5 A4,4 0 0 1 13.5,11.5 V13</StreamGeometry>
+        <StreamGeometry x:Key="IconClose">M4,4 L12,12 M12,4 L4,12</StreamGeometry>
+    </Application.Resources>
+
+    <Application.DataTemplates>
+        <!-- Поле коментаря: створюється лише тоді, коли його відкрили під рядком -->
+        <DataTemplate DataType="shared:ComposerModel">
+            <local:CommentBox/>
+        </DataTemplate>
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme/>
+
+        <!-- Маленька квадратна кнопка з іконкою -->
+        <Style Selector="Button.icon">
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+            <Setter Property="Background" Value="{DynamicResource Btn}"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="B" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.icon:pointerover /template/ Border#B">
+            <Setter Property="Opacity" Value="0.75"/>
+        </Style>
+
+        <!-- Прозора кнопка-іконка в шапці -->
+        <Style Selector="Button.ghost">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg3}"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+        </Style>
+        <Style Selector="Button.ghost:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        </Style>
+        <Style Selector="Button.ghost:pointerover /template/ Border#B">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+
+        <!-- Текстова кнопка в нижньому рядку -->
+        <Style Selector="Button.link">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg3}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}">
+                        <ContentPresenter Content="{TemplateBinding Content}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.link:pointerover">
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        </Style>
+
+        <!-- Рядок у меню статусів -->
+        <Style Selector="Button.menurow">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="B" Background="{TemplateBinding Background}" CornerRadius="8" Padding="9,7">
+                        <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Stretch"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.menurow:pointerover /template/ Border#B">
+            <Setter Property="Background" Value="{DynamicResource Hover}"/>
+        </Style>
+
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg3}"/>
+        </Style>
+
+        <!-- Картка вікна: тінь окремим шаром, щоб текст не розмивався -->
+        <Style Selector="Border.shadow">
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Background" Value="{DynamicResource CardSolid}"/>
+            <Setter Property="BoxShadow" Value="0 6 24 0 #50000000"/>
+        </Style>
+        <Style Selector="Border.card">
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Background" Value="{DynamicResource Card}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <!-- Меню статусів під кнопкою ⌄ -->
+        <Style Selector="FlyoutPresenter.card">
+            <Setter Property="Background" Value="{DynamicResource Menu}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+        </Style>
+
+        <!-- Меню (⋯ і правий клік) — спокійне, у кольорах теми -->
+        <Style Selector="ContextMenu">
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+    </Application.Styles>
+</Application>

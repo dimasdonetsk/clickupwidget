@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Опис програми для macOS. __VERSION__ підставляє mac/build-mac.sh. LSUIElement — без значка в Dock і в Cmd+Tab. -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>ClickUp Widget</string>
+    <key>CFBundleDisplayName</key>
+    <string>ClickUp Widget</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.dimasdonetsk.clickupwidget</string>
+    <key>CFBundleExecutable</key>
+    <string>ClickUpWidget</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>__VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__VERSION__</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>uk</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>

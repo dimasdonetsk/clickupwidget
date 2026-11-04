@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Спільна логіка для Windows (WPF, src/) і Mac (Avalonia, mac/): задачі, інбокс, коментарі, клієнт ClickUp,
+       налаштування, оновлення. Без вікон — тести (tests/) ганяються і на Windows, і на Mac. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>ClickUpWidget.Core</AssemblyName>
+    <RootNamespace>ClickUpWidget</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.161" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Обидві програми мають збірку ClickUpWidget (exe) -->
+    <InternalsVisibleTo Include="ClickUpWidget" />
+    <InternalsVisibleTo Include="ClickUpWidget.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,17 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Win32;
 
 namespace ClickUpWidget
 {
     public sealed class Settings
     {
-        /// <summary>Особистий API-токен ClickUp, зашифрований DPAPI (розшифрувати може лише цей користувач Windows).</summary>
+        /// <summary>
+        /// Особистий API-токен ClickUp, зашифрований DPAPI (розшифрувати може лише цей користувач Windows).
+        /// На Mac тут порожньо: токен лежить у Keychain (див. <see cref="Secret"/>).
+        /// </summary>
         public string? TokenEnc { get; set; }
         /// <summary>Робочий простір (team id). Якщо їх кілька — обирається в меню трею.</summary>
         public string? TeamId { get; set; }
@@ -87,17 +87,23 @@ namespace ClickUpWidget
         /// <summary>Як часто оновлювати задачі, хв.</summary>
         public int RefreshMinutes { get; set; } = 2;
 
-        public static string DataDir =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClickUpWidget");
+        /// <summary>Налаштування, стан інбоксу й журнал: %AppData%\ClickUpWidget, на Mac — ~/Library/Application Support/ClickUpWidget.</summary>
+        public static string DataDir { get; internal set; } = OperatingSystem.IsMacOS()
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support", "ClickUpWidget")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClickUpWidget");
 
         private static string FilePath => Path.Combine(DataDir, "settings.json");
 
         [JsonIgnore]
         public string? Token
         {
-            get => Secret.Unprotect(TokenEnc);
-            set => TokenEnc = Secret.Protect(value);
+            get => Secret.LoadToken(this);
+            set => Secret.SaveToken(this, value);
         }
+
+        /// <summary>Чи збережено токен (без розшифрування; на Mac — з пам'яті після першого читання).</summary>
+        [JsonIgnore]
+        public bool HasToken => Secret.HasToken(this);
 
         public static Settings Load()
         {
@@ -118,86 +124,6 @@ namespace ClickUpWidget
                 File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
             }
             catch (Exception ex) { Log.Write("Settings save: " + ex.Message); }
-        }
-    }
-
-    internal static class Secret
-    {
-        public static string? Protect(string? plain)
-        {
-            if (string.IsNullOrEmpty(plain)) return null;
-            try
-            {
-                byte[] data = ProtectedData.Protect(Encoding.UTF8.GetBytes(plain), null, DataProtectionScope.CurrentUser);
-                return Convert.ToBase64String(data);
-            }
-            catch (Exception ex) { Log.Write("Protect: " + ex.Message); return null; }
-        }
-
-        public static string? Unprotect(string? enc)
-        {
-            if (string.IsNullOrEmpty(enc)) return null;
-            try
-            {
-                byte[] data = ProtectedData.Unprotect(Convert.FromBase64String(enc), null, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(data);
-            }
-            catch (Exception ex) { Log.Write("Unprotect: " + ex.Message); return null; }
-        }
-    }
-
-    internal static class AutostartHelper
-    {
-        private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        // Сюди Windows пише, чи автозапуск не вимкнули в Диспетчері завдань → «Автозавантаження».
-        private const string ApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
-        private const string ValueName = "ClickUpWidget";
-
-        /// <summary>Шлях до exe. Інсталятор кладе програму в …\current\ClickUpWidget.exe — він не змінюється між оновленнями.</summary>
-        private static string? ExePath()
-        {
-            string? path = Environment.ProcessPath;
-            if (path == null) return null;
-            string? dir = Path.GetDirectoryName(path);
-            string? root = dir != null ? Path.GetDirectoryName(dir) : null;
-            if (root != null && !string.Equals(Path.GetFileName(dir), "current", StringComparison.OrdinalIgnoreCase))
-            {
-                string current = Path.Combine(root, "current", Path.GetFileName(path));
-                if (File.Exists(current) && File.Exists(Path.Combine(root, "Update.exe"))) return current;
-            }
-            return path;
-        }
-
-        public static void Apply(bool enabled, bool userAction = false)
-        {
-            try
-            {
-                using RegistryKey key = Registry.CurrentUser.OpenSubKey(RunKey, true) ?? Registry.CurrentUser.CreateSubKey(RunKey);
-                string? exe = ExePath();
-                if (enabled && exe != null)
-                {
-                    string value = "\"" + exe + "\" --autostart";
-                    if (!string.Equals(key.GetValue(ValueName) as string, value, StringComparison.Ordinal))
-                        key.SetValue(ValueName, value);
-                    if (userAction)
-                        using (RegistryKey? approved = Registry.CurrentUser.OpenSubKey(ApprovedKey, true))
-                            approved?.DeleteValue(ValueName, false);
-                }
-                else
-                    key.DeleteValue(ValueName, false);
-            }
-            catch (Exception ex) { Log.Write("Autostart: " + ex.Message); }
-        }
-
-        /// <summary>Автозапуск вимкнули в Диспетчері завдань (Windows пропускає наш запис).</summary>
-        public static bool DisabledByWindows()
-        {
-            try
-            {
-                using RegistryKey? approved = Registry.CurrentUser.OpenSubKey(ApprovedKey);
-                return approved?.GetValue(ValueName) is byte[] b && b.Length > 0 && (b[0] & 1) == 1;
-            }
-            catch { return false; }
         }
     }
 }

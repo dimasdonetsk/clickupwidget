@@ -1,0 +1,14 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:ClickUpWidget.Mac"
+        x:Class="ClickUpWidget.Mac.PanelWindow"
+        Title="ClickUp Widget" Width="392" SizeToContent="Height"
+        SystemDecorations="None" Background="Transparent" TransparencyLevelHint="Transparent"
+        CanResize="False" ShowInTaskbar="False" ShowActivated="False">
+    <Panel Margin="16,12,16,20">
+        <Border Classes="shadow"/>
+        <Border Classes="card" Padding="14,16,14,12">
+            <local:TasksView Name="View"/>
+        </Border>
+    </Panel>
+</Window>

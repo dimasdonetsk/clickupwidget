@@ -1,0 +1,105 @@
+name: macOS
+
+# Збірка ClickUp Widget для Mac (Avalonia, mac/) на справжньому Маку GitHub.
+# Тести спільної логіки → .app для Apple Silicon та Intel → пакети Velopack → самоперевірка
+# (Keychain, автозапуск) → знімки вікон з демо-даними. Готові пакети — в артефактах збірки.
+# Windows-реліз (build.yml) цей файл не чіпає. До релізу GitHub маківські пакети додаються
+# лише вручну: Actions → macOS → Run workflow → «publish».
+
+on:
+  push:
+    branches: [macos]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Додати маківські пакети до релізу поточної версії (реліз Windows уже має існувати)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      REPO_URL: https://github.com/${{ github.repository }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Read version
+        id: ver
+        run: |
+          v=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/ClickUpWidget.csproj | head -1)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Версія $v · $(sw_vers -productName) $(sw_vers -productVersion) · $(uname -m)"
+
+      - name: Tests (спільна логіка)
+        run: dotnet test tests/ClickUpWidget.Tests/ClickUpWidget.Tests.csproj -c Release
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.161
+
+      - name: Build Apple Silicon
+        run: bash mac/build-mac.sh osx-arm64 out-mac
+
+      - name: Build Intel
+        run: bash mac/build-mac.sh osx-x64 out-mac
+
+      - name: Self-test (Keychain, автозапуск)
+        run: '"out-mac/osx-arm64/ClickUp Widget.app/Contents/MacOS/ClickUpWidget" --selftest'
+
+      - name: Screenshots (демо-дані, без ClickUp)
+        run: |
+          mkdir -p out-mac/shots
+          APP="out-mac/osx-arm64/ClickUp Widget.app/Contents/MacOS/ClickUpWidget"
+          # Не більше 2 хвилин: якщо вікна не відкрились, крок впаде, а не зависне.
+          perl -e 'alarm shift; exec @ARGV' 120 "$APP" --screenshot "$PWD/out-mac/shots"
+          perl -e 'alarm shift; exec @ARGV' 120 "$APP" --light --screenshot "$PWD/out-mac/shots"
+          ls -la out-mac/shots
+          test -f out-mac/shots/PanelWindow.png
+          test -f out-mac/shots/InboxWindow.png
+          test -f out-mac/shots/FlyoutWindow.png
+
+      - name: Demo log
+        if: always()
+        run: cat "$TMPDIR/ClickUpWidget-demo/log.txt" 2>/dev/null || echo "(журналу немає)"
+
+      - name: Check installed app (pkg → /Applications)
+        continue-on-error: true
+        run: |
+          PKG=$(ls out-mac/osx-arm64/Releases/*.pkg | head -1)
+          echo "Ставлю $PKG"
+          sudo installer -pkg "$PKG" -target /
+          ls -la "/Applications/ClickUp Widget.app/Contents/MacOS" | head -5
+          perl -e 'alarm shift; exec @ARGV' 60 "/Applications/ClickUp Widget.app/Contents/MacOS/ClickUpWidget" --selftest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClickUpWidget-mac-${{ steps.ver.outputs.version }}
+          path: |
+            out-mac/osx-arm64/Releases/*
+            out-mac/osx-x64/Releases/*
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-mac-${{ steps.ver.outputs.version }}
+          path: out-mac/shots/*
+
+      - name: Add to GitHub release (вручну)
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=${{ steps.ver.outputs.version }}
+          gh release view "v$v" --repo "${{ github.repository }}" > /dev/null
+          for rid in osx-arm64 osx-x64; do
+            vpk upload github --outputDir "out-mac/$rid/Releases" --channel "$rid" --repoUrl "$REPO_URL" \
+              --token "$GH_TOKEN" --merge --publish --tag "v$v" --releaseName "ClickUp Widget $v"
+          done
