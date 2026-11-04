@@ -65,9 +65,11 @@ namespace ClickUpWidget
 
             TodayLine.Visibility = Vis(showTime);
             TimerCard.Visibility = Vis(showTimer && vm?.HasTimer == true);
+            // Задачі з таймером у списках немає — якщо картку сховано, показуємо її першим рядком.
+            RunningHost.Visibility = Vis(!showTimer && vm?.RunningRow != null);
             DueSection.Visibility = Vis(showDue && vm?.HasDue == true);
             AllSection.Visibility = Vis(showAll);
-            EmptyText.Visibility = Vis(showAll && loaded && vm!.HasTasks == false);
+            EmptyText.Visibility = Vis(showAll && loaded && vm!.HasTasks == false && vm.HasTimer == false);
             CompactEmpty.Visibility = Vis(_compact && showDue && loaded && vm!.HasDue == false);
             OpenLink.Visibility = Vis(vm?.HasUpdate != true);
         }
@@ -90,6 +92,15 @@ namespace ClickUpWidget
 
         private static DependencyObject? ParentOf(DependencyObject d) =>
             d is Visual || d is System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+
+        /// <summary>Клік по картці таймера відкриває задачу в ClickUp (якщо не по кнопці й не по полю коментаря).</summary>
+        private void TimerCard_Click(object sender, MouseButtonEventArgs e)
+        {
+            for (DependencyObject? d = e.OriginalSource as DependencyObject; d != null && d != sender; d = ParentOf(d))
+                if (d is ButtonBase || d is CommentBox) return;
+            if (_vm?.RunningRow is TaskRow row && row.Task.Url.Length > 0)
+                _vm.OpenTask.Execute(row);
+        }
 
         private void CommentBtn_Click(object sender, RoutedEventArgs e)
         {

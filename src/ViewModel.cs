@@ -96,6 +96,9 @@ namespace ClickUpWidget
         private bool _isRunning;
         public bool IsRunning { get => _isRunning; set => Set(ref _isRunning, value); }
 
+        /// <summary>Відомо, в якому списку задача (без цього не завантажити статуси).</summary>
+        public bool HasList => Task.ListId.Length > 0;
+
         public TaskRow(TaskItem task, DateTime now)
         {
             Task = task;
@@ -135,6 +138,10 @@ namespace ClickUpWidget
         // Таймер
         private bool _hasTimer;
         public bool HasTimer { get => _hasTimer; set => Set(ref _hasTimer, value); }
+        private TaskRow? _runningRow;
+        /// <summary>Задача з таймером. Показується один раз: у картці таймера, а якщо картку сховано — першим рядком.</summary>
+        public TaskRow? RunningRow { get => _runningRow; set { if (Set(ref _runningRow, value)) Raise(nameof(HasRunningRow)); } }
+        public bool HasRunningRow => RunningRow != null;
         private string _timerTitle = "";
         public string TimerTitle { get => _timerTitle; set => Set(ref _timerTitle, value); }
         private string _timerProject = "";

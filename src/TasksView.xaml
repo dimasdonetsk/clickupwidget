@@ -104,36 +104,96 @@
             </StackPanel>
         </Border>
 
-        <!-- Запущений таймер -->
+        <!-- Запущений таймер. Задача з таймером живе тут, а не в списках: клік відкриває її,
+             при наведенні на місці годинника — ті самі дії, що й у рядку (як дедлайн у рядку, тож нічого не стрибає). -->
         <Border x:Name="TimerCard" Visibility="Collapsed" Background="{DynamicResource TimerBg}"
-                BorderBrush="{DynamicResource TimerLine}" BorderThickness="1" CornerRadius="12" Padding="12,8" Margin="0,0,0,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <Ellipse Width="8" Height="8" Fill="{DynamicResource TimerFg}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <Border Grid.Column="1" Background="{Binding TimerChipBack}" CornerRadius="6" Padding="6,1,6,2" Margin="0,0,10,0"
-                        VerticalAlignment="Center" Visibility="{Binding HasTimerProject, Converter={StaticResource Vis}}">
-                    <TextBlock Text="{Binding TimerProject}" Foreground="{Binding TimerChipFore}" FontSize="10.5" FontWeight="Bold"/>
-                </Border>
-                <TextBlock Grid.Column="2" Text="{Binding TimerTitle}" FontSize="13" TextTrimming="CharacterEllipsis"
-                           VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="3" Text="{Binding TimerClock}" FontSize="13" FontWeight="SemiBold" Margin="10,0,10,0"
-                           Foreground="{DynamicResource TimerFg}" VerticalAlignment="Center"
-                           Typography.NumeralAlignment="Tabular"/>
-                <Button Grid.Column="4" Style="{StaticResource IconButton}" Background="{DynamicResource TimerLine}"
-                        Foreground="{DynamicResource TimerFg}" Command="{Binding StopTimer}" ToolTip="Зупинити таймер"
-                        Content="&#xE71A;"/>
-            </Grid>
+                BorderBrush="{DynamicResource TimerLine}" BorderThickness="1" CornerRadius="12" Padding="12,8" Margin="0,0,0,8"
+                MouseLeftButtonUp="TimerCard_Click">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding RunningRow}" Value="{x:Null}">
+                            <Setter Property="Cursor" Value="Arrow"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding RunningRow.IsComposing}" Value="True">
+                            <Setter Property="Cursor" Value="Arrow"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <Grid ToolTip="{Binding RunningRow.Tooltip}" ToolTipService.InitialShowDelay="900">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="8" Height="8" Fill="{DynamicResource TimerFg}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Border Grid.Column="1" Background="{Binding TimerChipBack}" CornerRadius="6" Padding="6,1,6,2" Margin="0,0,10,0"
+                            VerticalAlignment="Center" Visibility="{Binding HasTimerProject, Converter={StaticResource Vis}}">
+                        <TextBlock Text="{Binding TimerProject}" Foreground="{Binding TimerChipFore}" FontSize="10.5" FontWeight="Bold"/>
+                    </Border>
+                    <TextBlock Grid.Column="2" Text="{Binding TimerTitle}" FontSize="13" TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+                    <!-- Годинник і кнопки в одній клітинці: колонка завжди займає ширину більшого з них -->
+                    <Grid Grid.Column="3" Margin="10,0,10,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding TimerClock}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Right"
+                                   Foreground="{DynamicResource TimerFg}" VerticalAlignment="Center"
+                                   Typography.NumeralAlignment="Tabular">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsMouseOver, ElementName=TimerCard}" Value="True"/>
+                                                <Condition Binding="{Binding HasRunningRow}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Hidden"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Hidden"/>
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsMouseOver, ElementName=TimerCard}" Value="True"/>
+                                                <Condition Binding="{Binding HasRunningRow}" Value="True"/>
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <Button Style="{StaticResource IconButton}" Tag="{Binding RunningRow}" Click="CommentBtn_Click"
+                                    ToolTip="Залишити коментар" Content="&#xE8BD;"/>
+                            <Button Style="{StaticResource IconButton}" Tag="{Binding RunningRow}" Click="StatusBtn_Click" Margin="6,0,0,0"
+                                    ToolTip="Змінити статус" Content="&#xE70D;"
+                                    Visibility="{Binding RunningRow.HasList, Converter={StaticResource Vis}, FallbackValue=Collapsed}"/>
+                        </StackPanel>
+                    </Grid>
+                    <Button Grid.Column="4" Style="{StaticResource IconButton}" Background="{DynamicResource TimerLine}"
+                            Foreground="{DynamicResource TimerFg}" Command="{Binding StopTimer}" ToolTip="Зупинити таймер"
+                            Content="&#xE71A;"/>
+                </Grid>
+                <ContentPresenter Content="{Binding RunningRow.Composer}"/>
+            </StackPanel>
         </Border>
 
         <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                       MaxHeight="600" Focusable="False">
             <StackPanel Margin="0,0,2,0">
+                <!-- Картку таймера сховано в «Що показувати»: задача з таймером — першим рядком над списками -->
+                <ContentControl x:Name="RunningHost" Content="{Binding RunningRow}" ContentTemplate="{StaticResource RowTemplate}"
+                                Focusable="False" Visibility="Collapsed" Margin="0,0,0,6"/>
+
                 <!-- Сьогодні: дедлайн сьогодні або вже минув. Без кольорових акцентів. -->
                 <StackPanel x:Name="DueSection" Visibility="Collapsed">
                     <Grid Margin="4,4,4,4">

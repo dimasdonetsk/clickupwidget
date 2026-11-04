@@ -177,6 +177,36 @@ namespace ClickUpWidget.Tests
             Assert.False(c.R > 180 && c.G < 120 && c.B < 120, priority + " виглядає червоним: " + hex);
         }
 
+        // Задача з таймером показується один раз — зверху, а не ще й у списках.
+        [Fact]
+        public void RunningTaskIsNotInLists()
+        {
+            var tasks = new[]
+            {
+                new TaskItem { Id = "a", Status = "in progress", StatusType = "custom" },
+                new TaskItem { Id = "b", Status = "to do", StatusType = "open" },
+                new TaskItem { Id = "c", Status = "to do", StatusType = "open" },
+            };
+
+            var lists = TaskText.WithoutRunning(tasks, "a");
+            Assert.Equal(new[] { "b", "c" }, lists.Select(t => t.Id));
+            // Група, де була лише задача з таймером, зникає разом з нею.
+            Assert.DoesNotContain(TaskText.Group(lists), g => g.Status == "in progress");
+
+            Assert.Equal(3, TaskText.WithoutRunning(tasks, null).Count);
+        }
+
+        [Fact]
+        public void TimerOnTaskOutsideMyListStillHasTitleAndLink()
+        {
+            TaskItem t = TaskText.FromTimer(new RunningTimer("86c1x2", "АП: Банер - верстка", DateTime.UtcNow));
+            Assert.Equal("86c1x2", t.Id);
+            Assert.Equal("АП", t.Project);
+            Assert.Equal("Банер — верстка", t.Title);
+            Assert.Equal("https://app.clickup.com/t/86c1x2", t.Url);
+            Assert.Equal("", t.ListId);   // невідомий список — змінити статус звідси не можна
+        }
+
         [Fact]
         public void LowOrNoPriorityIsGrey()
         {

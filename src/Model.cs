@@ -172,6 +172,24 @@ namespace ClickUpWidget
             _ => StatusLabel(priority!),
         };
 
+        /// <summary>Задачі для списків: та, що зараз трекається, показується окремо зверху, тож у списках її немає.</summary>
+        public static List<TaskItem> WithoutRunning(IEnumerable<TaskItem> tasks, string? runningTaskId) =>
+            tasks.Where(t => runningTaskId == null || t.Id != runningTaskId).ToList();
+
+        /// <summary>Таймер на задачі, якої немає в моєму списку: назва й посилання — з того, що знає таймер.</summary>
+        public static TaskItem FromTimer(RunningTimer timer)
+        {
+            (string project, string title) = Split(timer.TaskName);
+            return new TaskItem
+            {
+                Id = timer.TaskId,
+                RawName = timer.TaskName,
+                Project = project,
+                Title = title,
+                Url = timer.TaskId.Length > 0 ? "https://app.clickup.com/t/" + timer.TaskId : "",
+            };
+        }
+
         /// <summary>
         /// Спокійний колір прапорця пріоритету. Кольори ClickUp не беремо: «Терміновий» там яскраво-червоний.
         /// null — сірий (низький або без пріоритету).

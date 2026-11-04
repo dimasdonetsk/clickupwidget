@@ -245,6 +245,16 @@ namespace ClickUpWidget
         {
             DateTime now = DateTime.Now;
 
+            // Таймер зупинили чи перемкнули, поки писали коментар у його картці: картка зміниться, тож поле закриваємо.
+            if (_composerHost is TaskRow host && ReferenceEquals(host, _vm.RunningRow) && host.TaskId != _running?.TaskId)
+            {
+                host.Composer = null;
+                _composerHost = null;
+            }
+
+            // Задача з таймером показується один раз — зверху, тож у списках її немає.
+            List<TaskItem> listed = TaskText.WithoutRunning(_tasks, _running?.TaskId);
+
             if (_composerHost != null)
             {
                 // Людина пише коментар — рядки не перебудовуємо (інакше поле зникне), лише позначки таймера.
@@ -256,12 +266,12 @@ namespace ClickUpWidget
             {
                 _rowsDirty = false;
                 _vm.DueRows.Clear();
-                foreach (TaskItem t in _tasks.Where(t => TaskText.IsDueNow(t.Due, now)).OrderBy(t => t.Due))
+                foreach (TaskItem t in listed.Where(t => TaskText.IsDueNow(t.Due, now)).OrderBy(t => t.Due))
                     _vm.DueRows.Add(MakeRow(t, now));
                 _vm.DueCount = _vm.DueRows.Count;
 
                 _vm.Groups.Clear();
-                foreach ((string status, string? color, List<TaskItem> list) in TaskText.Group(_tasks))
+                foreach ((string status, string? color, List<TaskItem> list) in TaskText.Group(listed))
                 {
                     var g = new StatusGroup
                     {
@@ -272,19 +282,24 @@ namespace ClickUpWidget
                     foreach (TaskItem t in list) g.Rows.Add(MakeRow(t, now));
                     _vm.Groups.Add(g);
                 }
-                _vm.OpenCount = _tasks.Count;
+                _vm.OpenCount = listed.Count;
             }
 
             if (_running != null)
             {
-                TaskItem? task = _tasks.FirstOrDefault(t => t.Id == _running.TaskId);
-                (string project, string title) = task != null ? (task.Project, task.Title) : TaskText.Split(_running.TaskName);
-                (System.Windows.Media.Brush back, System.Windows.Media.Brush fore) = Theme.Chip(project);
-                _vm.TimerProject = project;
+                // Шукаємо серед усіх моїх задач (і в схованих статусах); немає — беремо назву з таймера.
+                TaskItem task = _allTasks.FirstOrDefault(t => t.Id == _running.TaskId) ?? TaskText.FromTimer(_running);
+                (System.Windows.Media.Brush back, System.Windows.Media.Brush fore) = Theme.Chip(task.Project);
+                _vm.TimerProject = task.Project;
                 _vm.TimerChipBack = back;
                 _vm.TimerChipFore = fore;
-                _vm.TimerTitle = title.Length > 0 ? title : "Без задачі";
+                _vm.TimerTitle = task.Title.Length > 0 ? task.Title : "Без задачі";
+
+                // Рядок для дій у картці таймера (коментар, статус, відкрити). Поки в ньому пишуть — не чіпаємо.
+                bool composingHere = _composerHost != null && ReferenceEquals(_composerHost, _vm.RunningRow);
+                if (!composingHere) _vm.RunningRow = task.Id.Length > 0 ? MakeRow(task, now) : null;
             }
+            else _vm.RunningRow = null;
             _vm.HasTimer = _running != null;
             Tick();
         }
