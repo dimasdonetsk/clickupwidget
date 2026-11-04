@@ -40,7 +40,8 @@ namespace ClickUpWidget.Mac
                 else if (!TryLockInstance())
                 {
                     Log.Write("Already running, exit");
-                    desktop.Shutdown();
+                    // Закривати можна лише після старту головного циклу.
+                    Dispatcher.UIThread.Post(() => desktop.Shutdown());
                 }
                 else
                 {

@@ -40,44 +40,41 @@ jobs:
           echo "Версія $v · $(sw_vers -productName) $(sw_vers -productVersion) · $(uname -m)"
 
       - name: Tests (спільна логіка)
-        run: dotnet test tests/ClickUpWidget.Tests/ClickUpWidget.Tests.csproj -c Release
+        run: bash mac/ci-step.sh "Tests" dotnet test tests/ClickUpWidget.Tests/ClickUpWidget.Tests.csproj -c Release
 
       - name: Install vpk
         run: dotnet tool install -g vpk --version 1.2.161
 
       - name: Build Apple Silicon
-        run: bash mac/build-mac.sh osx-arm64 out-mac
+        run: CI_STEP_NOTICE=1 bash mac/ci-step.sh "Build Apple Silicon" bash mac/build-mac.sh osx-arm64 out-mac
 
       - name: Build Intel
-        run: bash mac/build-mac.sh osx-x64 out-mac
+        run: CI_STEP_NOTICE=1 bash mac/ci-step.sh "Build Intel" bash mac/build-mac.sh osx-x64 out-mac
 
       - name: Self-test (Keychain, автозапуск)
-        run: '"out-mac/osx-arm64/ClickUp Widget.app/Contents/MacOS/ClickUpWidget" --selftest'
+        run: CI_STEP_NOTICE=1 bash mac/ci-step.sh "Self-test" "out-mac/osx-arm64/ClickUp Widget.app/Contents/MacOS/ClickUpWidget" --selftest
 
       - name: Screenshots (демо-дані, без ClickUp)
         run: |
           mkdir -p out-mac/shots
           APP="out-mac/osx-arm64/ClickUp Widget.app/Contents/MacOS/ClickUpWidget"
           # Не більше 2 хвилин: якщо вікна не відкрились, крок впаде, а не зависне.
-          perl -e 'alarm shift; exec @ARGV' 120 "$APP" --screenshot "$PWD/out-mac/shots"
-          perl -e 'alarm shift; exec @ARGV' 120 "$APP" --light --screenshot "$PWD/out-mac/shots"
-          ls -la out-mac/shots
+          bash mac/ci-step.sh "Screenshots" perl -e 'alarm shift; exec @ARGV' 120 "$APP" --screenshot "$PWD/out-mac/shots"
+          bash mac/ci-step.sh "Screenshots light" perl -e 'alarm shift; exec @ARGV' 120 "$APP" --light --screenshot "$PWD/out-mac/shots"
+          CI_STEP_NOTICE=1 bash mac/ci-step.sh "Screenshots list" ls -la out-mac/shots
           test -f out-mac/shots/PanelWindow.png
           test -f out-mac/shots/InboxWindow.png
           test -f out-mac/shots/FlyoutWindow.png
 
       - name: Demo log
         if: always()
-        run: cat "$TMPDIR/ClickUpWidget-demo/log.txt" 2>/dev/null || echo "(журналу немає)"
+        run: CI_STEP_NOTICE=1 bash mac/ci-step.sh "Demo log" cat "$TMPDIR/ClickUpWidget-demo/log.txt"
 
       - name: Check installed app (pkg → /Applications)
         continue-on-error: true
         run: |
           PKG=$(ls out-mac/osx-arm64/Releases/*.pkg | head -1)
-          echo "Ставлю $PKG"
-          sudo installer -pkg "$PKG" -target /
-          ls -la "/Applications/ClickUp Widget.app/Contents/MacOS" | head -5
-          perl -e 'alarm shift; exec @ARGV' 60 "/Applications/ClickUp Widget.app/Contents/MacOS/ClickUpWidget" --selftest
+          CI_STEP_NOTICE=1 bash mac/ci-step.sh "Install pkg" bash -c "sudo installer -pkg '$PKG' -target / && ls -d /Applications/*.app | grep -i clickup && '/Applications/ClickUp Widget.app/Contents/MacOS/ClickUpWidget' --selftest"
 
       - uses: actions/upload-artifact@v4
         with:

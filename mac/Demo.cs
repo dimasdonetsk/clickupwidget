@@ -41,7 +41,8 @@ namespace ClickUpWidget.Mac
                 foreach (int size in new[] { 16, 32, 64, 128, 256, 512, 1024 })
                     Icons.SaveAppIcon(Path.Combine(iconDir, "icon_" + size + ".png"), size);
                 Console.WriteLine("Icons → " + iconDir);
-                desktop.Shutdown();
+                // Закривати можна лише після старту головного циклу.
+                Dispatcher.UIThread.Post(() => desktop.Shutdown());
                 return;
             }
 
